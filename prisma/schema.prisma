@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String         @id @default(cuid())
+  name             String
+  email            String         @unique
+  password         String
+  bio              String         @default("")
+  image            String         @default("")
+  stripeCustomerId String?        @unique
+  projects         Project[]
+  comments         Comment[]
+  notifications    Notification[]
+  teamMembers      TeamMember[]
+  organization     Organization?
+  subscription     Subscription?
+  createdAt        DateTime       @default(now())
+}
+
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeSubscriptionId String? @unique
+  stripePriceId      String?
+  plan               String   @default("free")
+  interval           String   @default("monthly")
+  status             String   @default("active")
+  storageLimitMB     Int      @default(100)
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  title       String
+  publicToken String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images      Image[]
+  createdAt   DateTime @default(now())
+}
+
+model Image {
+  id           String    @id @default(cuid())
+  title        String
+  filename     String
+  originalName String
+  width        Int
+  height       Int
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments     Comment[]
+  orderIndex   Int       @default(0)
+  createdAt    DateTime  @default(now())
+}
+
+model Comment {
+  id             String   @id @default(cuid())
+  content        String
+  xPercent       Float
+  yPercent       Float
+  guestName      String?
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  imageId        String
+  image          Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  resolved       Boolean  @default(false)
+  fileUrl        String?
+  fileName       String?
+  fileType       String?
+  annotationType String   @default("pin")
+  annotationData String?
+  createdAt      DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model TeamMember {
+  id          String    @id @default(cuid())
+  email       String
+  name        String    @default("")
+  role        String    @default("Collaborator")
+  status      String    @default("Pending")
+  invitedById String
+  invitedBy   User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+  invitedAt   DateTime  @default(now())
+  acceptedAt  DateTime?
+}
+
+model Organization {
+  id          String @id @default(cuid())
+  name        String @default("")
+  website     String @default("")
+  industry    String @default("")
+  teamSize    String @default("")
+  description String @default("")
+  logoUrl     String @default("")
+  brandColor  String @default("#6366f1")
+  tagline     String @default("")
+  phone       String @default("")
+  address     String @default("")
+  userId      String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

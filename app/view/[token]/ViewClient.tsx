@@ -1,0 +1,1035 @@
+'use client'
+
+import { useState, useCallback, useEffect } from 'react'
+import Link from 'next/link'
+import {
+  MapPin,
+  ArrowLeft,
+  MessageSquare,
+  Eye,
+  EyeOff,
+  CheckCircle,
+  Share2,
+  Lock,
+  User as UserIcon,
+  Files,
+  Settings,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  ArrowUpRight,
+  Square,
+  Circle as CircleIcon,
+  Pencil,
+  Zap,
+  Globe,
+  FileText,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+const COLORS = [
+  { id: 'red', hex: '#ef4444' },
+  { id: 'orange', hex: '#f97316' },
+  { id: 'yellow', hex: '#eab308' },
+  { id: 'green', hex: '#22c55e' },
+  { id: 'blue', hex: '#3b82f6' },
+  { id: 'purple', hex: '#a855f7' },
+]
+import { useToast } from '@/components/ui/Toast'
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { Button } from '@/components/ui/Button'
+import { AnnotationCanvas } from '@/components/annotation/AnnotationCanvas'
+import { CommentSidebar } from '@/components/annotation/CommentSidebar'
+import { GuestNamePrompt } from '@/components/annotation/GuestNamePrompt'
+import { EditProjectModal } from '@/components/dashboard/EditProjectModal'
+import { getImageUrl } from '@/lib/image-url'
+
+interface Comment {
+  id: string
+  content: string
+  xPercent: number
+  yPercent: number
+  guestName: string | null
+  userId: string | null
+  user: { id: string; name: string } | null
+  resolved: boolean
+  fileUrl: string | null
+  fileName: string | null
+  fileType: string | null
+  createdAt: string
+  annotationType?: string
+  annotationData?: string | null
+}
+
+interface ImageDetails {
+  id: string
+  title: string
+  filename: string
+  originalName: string
+  width: number
+  height: number
+  projectId: string
+  createdAt: string
+  comments: Comment[]
+}
+
+interface ProjectDetails {
+  id: string
+  title: string
+  publicToken: string
+  userId: string
+  createdAt: string
+  user: { id: string; name: string }
+  images: ImageDetails[]
+}
+
+interface ViewClientProps {
+  initialProject: ProjectDetails
+  isOwner: boolean
+  session: any
+  ownerPlan: string
+  ownerOrganization: {
+    name: string
+    logoUrl: string
+    brandColor: string
+    tagline: string
+  } | null
+}
+
+export function ViewClient({
+  initialProject,
+  isOwner,
+  session,
+  ownerPlan = 'free',
+  ownerOrganization = null,
+}: ViewClientProps) {
+  const [project, setProject] = useState<ProjectDetails>(initialProject)
+  const [activeImageId, setActiveImageId] = useState<string>(
+    initialProject.images[0]?.id || ''
+  )
+  const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null)
+  const [isCommentMode, setIsCommentMode] = useState(true)
+  const [guestName, setGuestName] = useState<string | null>(null)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [sidebarTab, setSidebarTab] = useState<'designs' | 'revisions'>('designs')
+  const [activeTool, setActiveTool] = useState<'pin' | 'rectangle' | 'circle' | 'line' | 'arrow' | 'freehand'>('pin')
+  const [activeColor, setActiveColor] = useState('#ef4444')
+  const [showComments, setShowComments] = useState(true)
+  
+  // Redrawing existing comment shapes states
+  const [redrawingCommentId, setRedrawingCommentId] = useState<string | null>(null)
+  const [redrawingTool, setRedrawingTool] = useState<'rectangle' | 'circle' | 'line' | 'arrow' | 'freehand' | 'pin' | null>(null)
+  
+  const { toast } = useToast()
+
+  // Handle guest name retrieval on client side
+  useEffect(() => {
+    if (!session?.user) {
+      const stored = localStorage.getItem('pixelpin-guest-name')
+      if (stored) {
+        setGuestName(stored)
+      }
+    }
+  }, [session])
+
+  // Handle auto-focusing image and comment from query parameters (e.g. from notification link)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search)
+      const imageParam = searchParams.get('image')
+      const commentParam = searchParams.get('comment')
+      
+      if (imageParam && project.images.some((img) => img.id === imageParam)) {
+        setActiveImageId(imageParam)
+      }
+      if (commentParam) {
+        setSelectedCommentId(commentParam)
+      }
+    }
+  }, [project.images])
+
+  // Auto-show comments if a comment is selected
+  useEffect(() => {
+    if (selectedCommentId) {
+      setShowComments(true)
+    }
+  }, [selectedCommentId])
+
+  // Helper: find active image in state
+  const activeImage = project.images.find((img) => img.id === activeImageId)
+  const comments = activeImage?.comments || []
+
+  const handleProjectUpdated = useCallback((updatedProject: ProjectDetails) => {
+    setProject(updatedProject)
+    
+    // Check if the current active image was deleted or needs fallback
+    const activeExists = updatedProject.images.some((img) => img.id === activeImageId)
+    if (!activeExists && updatedProject.images.length > 0) {
+      setActiveImageId(updatedProject.images[0].id)
+    }
+  }, [activeImageId])
+
+  const handleAddComment = useCallback(
+    async (
+      xPercent: number,
+      yPercent: number,
+      content: string,
+      file: File | null,
+      annotationType = 'pin',
+      annotationData: string | null = null,
+      linkUrl?: string,
+      linkTitle?: string
+    ) => {
+      if (!activeImage) return
+
+      const activeName = session?.user?.name || guestName || 'Anonymous'
+
+      try {
+        const formData = new FormData()
+        formData.append('imageId', activeImage.id)
+        formData.append('content', content)
+        formData.append('xPercent', xPercent.toString())
+        formData.append('yPercent', yPercent.toString())
+        formData.append('guestName', session?.user ? '' : activeName)
+        formData.append('annotationType', annotationType)
+        if (annotationData) {
+          formData.append('annotationData', annotationData)
+        }
+        if (file) {
+          formData.append('file', file)
+        }
+        if (linkUrl) {
+          formData.append('linkUrl', linkUrl)
+        }
+        if (linkTitle) {
+          formData.append('linkTitle', linkTitle)
+        }
+
+        const res = await fetch('/api/comments', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to save comment')
+        }
+
+        const newComment = await res.json()
+
+        // Append comment to the active image in project state
+        setProject((prev) => ({
+          ...prev,
+          images: prev.images.map((img) =>
+            img.id === activeImageId
+              ? { ...img, comments: [...img.comments, newComment] }
+              : img
+          ),
+        }))
+
+        setSelectedCommentId(newComment.id)
+        toast('success', 'Comment pinned successfully!')
+      } catch (err) {
+        console.error(err)
+        toast('error', 'Could not post comment. Please try again.')
+      }
+    },
+    [activeImage, activeImageId, guestName, session, toast]
+  )
+
+  const handleEditComment = useCallback(
+    async (id: string, newContent: string, file: File | null = null, removeFile = false, linkUrl?: string, linkTitle?: string) => {
+      try {
+        const formData = new FormData()
+        formData.append('content', newContent)
+        if (file) {
+          formData.append('file', file)
+        }
+        if (removeFile) {
+          formData.append('removeFile', 'true')
+        }
+        if (linkUrl !== undefined) {
+          formData.append('linkUrl', linkUrl || '')
+        }
+        if (linkTitle !== undefined) {
+          formData.append('linkTitle', linkTitle || '')
+        }
+
+        const res = await fetch(`/api/comments/${id}?guestName=${guestName || ''}`, {
+          method: 'PATCH',
+          body: formData,
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to edit comment')
+        }
+
+        const updated = await res.json()
+
+        // Update comment in project state
+        setProject((prev) => ({
+          ...prev,
+          images: prev.images.map((img) =>
+            img.id === activeImageId
+              ? {
+                  ...img,
+                  comments: img.comments.map((c) =>
+                    c.id === id
+                      ? {
+                          ...c,
+                          content: updated.content,
+                          fileUrl: updated.fileUrl,
+                          fileName: updated.fileName,
+                          fileType: updated.fileType,
+                        }
+                      : c
+                  ),
+                }
+              : img
+          ),
+        }))
+
+        toast('success', 'Comment updated!')
+      } catch (err) {
+        console.error(err)
+        toast('error', 'Failed to save edits.')
+      }
+    },
+    [activeImageId, guestName, toast]
+  )
+
+  const handleResolveComment = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/comments/${id}?guestName=${guestName || ''}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}), // Empty body triggers toggle resolved
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to resolve comment')
+        }
+
+        const updated = await res.json()
+
+        // Update resolved status in project state
+        setProject((prev) => ({
+          ...prev,
+          images: prev.images.map((img) =>
+            img.id === activeImageId
+              ? {
+                  ...img,
+                  comments: img.comments.map((c) =>
+                    c.id === id ? { ...c, resolved: updated.resolved } : c
+                  ),
+                }
+              : img
+          ),
+        }))
+
+        toast(
+          'success',
+          updated.resolved ? 'Comment resolved!' : 'Comment reopened!'
+        )
+      } catch (err) {
+        console.error(err)
+        toast('error', 'Failed to update comment status.')
+      }
+    },
+    [activeImageId, guestName, toast]
+  )
+
+  const handleDeleteComment = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/comments/${id}?guestName=${guestName || ''}`, {
+          method: 'DELETE',
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to delete comment')
+        }
+
+        // Remove comment from project state
+        setProject((prev) => ({
+          ...prev,
+          images: prev.images.map((img) =>
+            img.id === activeImageId
+              ? {
+                  ...img,
+                  comments: img.comments.filter((c) => c.id !== id),
+                }
+              : img
+          ),
+        }))
+
+        if (selectedCommentId === id) {
+          setSelectedCommentId(null)
+        }
+
+        toast('success', 'Comment deleted!')
+      } catch (err) {
+        console.error(err)
+        toast('error', 'Failed to delete comment.')
+      }
+    },
+    [activeImageId, guestName, selectedCommentId, toast]
+  )
+
+  // Actions context dropdown handlers for comments shape reselection
+  const handleShapeSelect = useCallback(
+    (commentId: string, shapeType: any) => {
+      setRedrawingCommentId(commentId)
+      setRedrawingTool(shapeType)
+      setIsCommentMode(true) // force comment mode to draw
+      toast('info', `Draw a new ${shapeType} annotation on the image to update.`)
+    },
+    [toast]
+  )
+
+  const handleRedrawComplete = useCallback(
+    async (commentId: string, type: string, data: string) => {
+      try {
+        const res = await fetch(`/api/comments/${commentId}?guestName=${guestName || ''}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            annotationType: type,
+            annotationData: data,
+          }),
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to update shape')
+        }
+
+        const updated = await res.json()
+
+        setProject((prev) => ({
+          ...prev,
+          images: prev.images.map((img) =>
+            img.id === activeImageId
+              ? {
+                  ...img,
+                  comments: img.comments.map((c) =>
+                    c.id === commentId
+                      ? {
+                          ...c,
+                          annotationType: updated.annotationType,
+                          annotationData: updated.annotationData,
+                        }
+                      : c
+                  ),
+                }
+              : img
+          ),
+        }))
+
+        toast('success', 'Annotation shape updated!')
+      } catch (err) {
+        console.error(err)
+        toast('error', 'Failed to update annotation shape.')
+      } finally {
+        setRedrawingCommentId(null)
+        setRedrawingTool(null)
+      }
+    },
+    [activeImageId, guestName, toast]
+  )
+
+  const handleCommentColorChange = useCallback(
+    async (commentId: string, colorHex: string) => {
+      const comment = comments.find((c) => c.id === commentId)
+      if (!comment) return
+
+      let parsedData = {}
+      try {
+        if (comment.annotationData) {
+          parsedData = JSON.parse(comment.annotationData)
+        }
+      } catch {}
+
+      const updatedData = JSON.stringify({
+        ...parsedData,
+        color: colorHex,
+      })
+
+      try {
+        const res = await fetch(`/api/comments/${commentId}?guestName=${guestName || ''}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            annotationData: updatedData,
+          }),
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to update color')
+        }
+
+        const updated = await res.json()
+
+        setProject((prev) => ({
+          ...prev,
+          images: prev.images.map((img) =>
+            img.id === activeImageId
+              ? {
+                  ...img,
+                  comments: img.comments.map((c) =>
+                    c.id === commentId ? { ...c, annotationData: updated.annotationData } : c
+                  ),
+                }
+              : img
+          ),
+        }))
+
+        toast('success', 'Annotation color updated!')
+      } catch (err) {
+        console.error(err)
+        toast('error', 'Failed to update color.')
+      }
+    },
+    [comments, activeImageId, guestName, toast]
+  )
+
+  const handleGuestSubmit = (name: string) => {
+    setGuestName(name)
+    toast('success', `Commenting as "${name}"`)
+  }
+
+  const handleShare = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.href)
+      toast('success', 'Project share link copied to clipboard!')
+    }
+  }
+
+  const handleImageSwitch = (imgId: string) => {
+    setActiveImageId(imgId)
+    setSelectedCommentId(null)
+  }
+
+  const brandAccentStyle = (ownerPlan === 'business' && ownerOrganization?.brandColor)
+    ? { '--primary': ownerOrganization.brandColor } as React.CSSProperties
+    : undefined
+
+  return (
+    <div
+      className="flex h-screen overflow-hidden flex-col bg-background text-foreground animate-fade-in"
+      style={brandAccentStyle}
+    >
+      {/* View Header */}
+      <header className="sticky top-0 z-40 h-16 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <Link
+              href={session ? '/dashboard' : '/'}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+
+            {/* Organization Branding Identity */}
+            {ownerOrganization && (ownerPlan === 'business' || ownerPlan === 'pro' || ownerPlan === 'starter') && (
+              <div className="flex items-center gap-2 border-r border-border pr-3 h-8 mr-1 shrink-0">
+                {ownerOrganization.logoUrl ? (
+                  <img src={ownerOrganization.logoUrl} alt="Logo" className="h-6 w-6 rounded object-cover" />
+                ) : (
+                  <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">
+                    {ownerOrganization.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex flex-col select-none leading-none">
+                  <span className="text-[11px] font-bold text-foreground truncate max-w-[80px]" title={ownerOrganization.name}>
+                    {ownerOrganization.name}
+                  </span>
+                  {ownerPlan !== 'business' && (
+                    <span className="text-[8px] text-muted-foreground mt-0.5">via PixelPin</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h1 className="max-w-[160px] truncate text-sm font-semibold sm:max-w-[260px]" title={project.title}>
+                {project.title}
+              </h1>
+              <p className="hidden text-tiny-10 text-muted-foreground sm:block">
+                Project shared by {project.user?.name}
+              </p>
+            </div>
+          </div>
+
+          {/* Controls: Add Comment & Show/Hide Comments */}
+          <div className="flex items-center gap-2">
+            {/* Add a Comment Mode Switcher */}
+            <div className="relative flex flex-col items-center">
+            <button
+              onClick={() => {
+                setIsCommentMode(!isCommentMode)
+                setRedrawingCommentId(null)
+                setRedrawingTool(null)
+              }}
+              className={cn(
+                "flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold border transition-all hover:scale-105 active:scale-95 shadow-sm",
+                isCommentMode
+                  ? "bg-primary text-primary-foreground border-primary shadow-primary/25 animate-pulse"
+                  : "bg-card border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {activeTool === 'pin' && <MapPin className="h-4 w-4 text-rose-500" />}
+              {activeTool === 'arrow' && <ArrowUpRight className="h-4 w-4" />}
+              {activeTool === 'rectangle' && <Square className="h-4 w-4" />}
+              {activeTool === 'circle' && <CircleIcon className="h-4 w-4" />}
+              {activeTool === 'freehand' && <Pencil className="h-4 w-4" />}
+              <span>Add a Comment</span>
+            </button>
+
+            {/* Annotation Dropdown Panel from the Button */}
+            {isCommentMode && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2.5 z-55 flex items-center gap-3 rounded-2xl border border-border bg-card/95 px-3 py-2 shadow-2xl backdrop-blur-xl animate-fade-in pointer-events-auto">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setActiveTool('pin')
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all",
+                      activeTool === 'pin'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                    title="Dot Pin"
+                  >
+                    <MapPin className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (ownerPlan === 'free' || ownerPlan === 'starter') {
+                        toast('error', 'Advanced annotation shapes (arrows, shapes, drawing) are only available on projects created by Pro or Business plans.')
+                        return
+                      }
+                      setActiveTool('arrow')
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all relative",
+                      activeTool === 'arrow'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                    title="Arrow Pointer"
+                  >
+                    <ArrowUpRight className="h-4 w-4" />
+                    {(ownerPlan === 'free' || ownerPlan === 'starter') && (
+                      <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (ownerPlan === 'free' || ownerPlan === 'starter') {
+                        toast('error', 'Advanced annotation shapes (arrows, shapes, drawing) are only available on projects created by Pro or Business plans.')
+                        return
+                      }
+                      setActiveTool('rectangle')
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all relative",
+                      activeTool === 'rectangle'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                    title="Rectangle Outline"
+                  >
+                    <Square className="h-4 w-4" />
+                    {(ownerPlan === 'free' || ownerPlan === 'starter') && (
+                      <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (ownerPlan === 'free' || ownerPlan === 'starter') {
+                        toast('error', 'Advanced annotation shapes (arrows, shapes, drawing) are only available on projects created by Pro or Business plans.')
+                        return
+                      }
+                      setActiveTool('circle')
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all relative",
+                      activeTool === 'circle'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                    title="Circle Outline"
+                  >
+                    <CircleIcon className="h-4 w-4" />
+                    {(ownerPlan === 'free' || ownerPlan === 'starter') && (
+                      <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (ownerPlan === 'free' || ownerPlan === 'starter') {
+                        toast('error', 'Advanced annotation shapes (arrows, shapes, drawing) are only available on projects created by Pro or Business plans.')
+                        return
+                      }
+                      setActiveTool('freehand')
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all relative",
+                      activeTool === 'freehand'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                    title="Pencil Draw"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    {(ownerPlan === 'free' || ownerPlan === 'starter') && (
+                      <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
+                    )}
+                  </button>
+                </div>
+
+                <div className="h-5 w-px bg-border" />
+
+                {/* Color swatches */}
+                <div className="flex items-center gap-1.5">
+                  {COLORS.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveColor(c.hex)
+                      }}
+                      className={cn(
+                        "h-4.5 w-4.5 rounded-full border transition-all",
+                        activeColor === c.hex
+                          ? 'ring-2 ring-primary ring-offset-2 scale-110 border-transparent'
+                          : 'border-border hover:scale-105'
+                      )}
+                      style={{ backgroundColor: c.hex }}
+                      title={`Color ${c.id}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Show/Hide Comments Toggle */}
+          <button
+            onClick={() => setShowComments(!showComments)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold border transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer",
+              showComments
+                ? "bg-card border-border text-foreground hover:bg-accent hover:text-foreground"
+                : "bg-muted border-border/80 text-muted-foreground hover:text-foreground"
+            )}
+            title={showComments ? "Hide Comment Pins" : "Show Comment Pins"}
+          >
+            {showComments ? (
+              <Eye className="h-4 w-4 text-primary" />
+            ) : (
+              <EyeOff className="h-4 w-4" />
+            )}
+            <span>{showComments ? "Hide Pins" : "Show Pins"}</span>
+          </button>
+        </div>
+
+          <div className="flex items-center gap-2">
+            {activeImage && (
+              activeImage.filename.startsWith('http') ? (
+                <a
+                  href={activeImage.filename}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm animate-fade-in"
+                  title="Open Link"
+                >
+                  <ArrowUpRight className="h-3.5 w-3.5 text-primary" />
+                  <span className="hidden sm:inline">Open Link</span>
+                </a>
+              ) : (
+                <a
+                  href={getImageUrl(activeImage.filename)}
+                  download={activeImage.originalName}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm animate-fade-in"
+                  title="Download Active Design"
+                >
+                  <Download className="h-3.5 w-3.5 text-primary" />
+                  <span className="hidden sm:inline">Download</span>
+                </a>
+              )
+            )}
+            {isOwner && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsEditOpen(true)}
+                className="gap-1.5 flex"
+              >
+                <Settings className="h-3.5 w-3.5 text-primary" />
+                Edit Project
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleShare}
+              className="hidden gap-1.5 sm:flex"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Share Project
+            </Button>
+            <ThemeToggle />
+            {!session?.user && (
+              <Link href="/sign-in" className="hidden sm:block">
+                <Button variant="ghost" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Annotation Workspace */}
+      <main className="flex flex-1 flex-col overflow-hidden lg:flex-row relative">
+        {/* Collapsible Left Designs Sidebar */}
+        <div
+          className={cn(
+            "relative flex flex-col h-full border-r-4 border-border bg-card/50 backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0",
+            isSidebarOpen ? "w-64" : "w-0 overflow-hidden border-r-0"
+          )}
+        >
+          {/* Tab Switcher: Designs vs Revisions */}
+          <div className="flex border-b border-border text-xs font-bold shrink-0 bg-muted/20 select-none">
+            <button
+              onClick={() => setSidebarTab('designs')}
+              className={cn(
+                "flex-1 py-3 text-center border-b-2 transition-all cursor-pointer",
+                sidebarTab === 'designs'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Designs ({project.images.length})
+            </button>
+            <button
+              onClick={() => setSidebarTab('revisions')}
+              className={cn(
+                "flex-1 py-3 text-center border-b-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                sidebarTab === 'revisions'
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Revisions
+              {(ownerPlan === 'free' || ownerPlan === 'starter') && (
+                <Lock className="h-3 w-3 text-amber-500" />
+              )}
+            </button>
+          </div>
+
+          {/* Sidebar Tab Contents */}
+          {sidebarTab === 'designs' ? (
+            /* Grid list of designs */
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {project.images.map((img) => {
+                const isActive = img.id === activeImageId
+                return (
+                  <div
+                    key={img.id}
+                    onClick={() => handleImageSwitch(img.id)}
+                    className={cn(
+                      "group relative cursor-pointer rounded-xl border overflow-hidden bg-muted/20 transition-all p-1.5",
+                      isActive
+                        ? "ring-2 ring-primary border-primary bg-primary/5"
+                        : "border-border/60 hover:border-primary/50 hover:bg-accent/40"
+                    )}
+                  >
+                    <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-border/80 bg-muted flex items-center justify-center">
+                      {img.filename.startsWith('http://') || img.filename.startsWith('https://') ? (
+                        <div className="flex flex-col items-center justify-center h-full w-full bg-primary/10 text-primary p-2">
+                          <Globe className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+                          <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-black mt-1 uppercase select-none">Link</span>
+                        </div>
+                      ) : img.filename.endsWith('.pdf') ? (
+                        <div className="flex flex-col items-center justify-center h-full w-full bg-rose-500/10 text-rose-500 p-2">
+                          <FileText className="h-6 w-6 text-rose-500 group-hover:scale-110 transition-transform" />
+                          <span className="text-[9px] bg-rose-500/20 text-rose-600 px-1.5 py-0.5 rounded font-black mt-1 uppercase select-none">PDF</span>
+                        </div>
+                      ) : (
+                        <img
+                          src={getImageUrl(img.filename)}
+                          alt={img.title}
+                          className="h-full w-full object-contain bg-background/50 group-hover:scale-105 transition-transform duration-300"
+                        />
+                      )}
+                      {img.comments.length > 0 && (
+                        <div className="absolute top-2 right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-tiny-10 font-bold text-white shadow-md">
+                          {img.comments.length}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 px-1">
+                      <p className="truncate text-xs font-semibold text-foreground group-hover:text-primary transition-colors" title={img.title}>
+                        {img.originalName}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            /* Revisions / Version History timeline */
+            (ownerPlan === 'free' || ownerPlan === 'starter') ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in">
+                <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shadow-sm">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <h3 className="text-xs font-bold text-foreground">Version History Locked</h3>
+                <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[180px]">
+                  Track design uploads, version iterations, and historical updates. Available on Pro & Business plans.
+                </p>
+                <a
+                  href="/pricing"
+                  className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 px-3.5 py-2 text-[10px] font-bold text-white hover:scale-105 active:scale-95 transition-all shadow-md shadow-purple-500/15 cursor-pointer"
+                >
+                  <Zap className="h-3 w-3" />
+                  Upgrade Plan
+                </a>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 animate-fade-in select-none">
+                <div className="flex items-center gap-2 border-b border-border/60 pb-3 mb-2 shrink-0">
+                  <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Revision History</span>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary">Active</span>
+                </div>
+                <div className="relative pl-4 border-l border-border/80 ml-2 space-y-6">
+                  {/* Mock Revisions Timeline based on uploaded designs */}
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                    <span className="text-[10px] font-bold text-primary">v1.1 - Current Version</span>
+                    <p className="text-[11px] text-foreground mt-1">Design upload iteration completed.</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">Uploaded {new Date(project.createdAt).toLocaleDateString()} · by {project.user?.name}</p>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-muted-foreground/55 ring-4 ring-background" />
+                    <span className="text-[10px] font-bold text-muted-foreground">v1.0 - Initial Upload</span>
+                    <p className="text-[11px] text-foreground mt-1">Project created with {project.images.length} images.</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">Created {new Date(project.createdAt).toLocaleDateString()} · by {project.user?.name}</p>
+                  </div>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* Circular Slide Toggle Button placed right on the border/dragging line */}
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="absolute top-1/2 -translate-y-1/2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card shadow-lg transition-all hover:bg-accent text-foreground hover:scale-110 active:scale-95 cursor-pointer"
+          style={{
+            left: isSidebarOpen ? 'calc(16rem - 14px)' : '4px',
+            transitionProperty: 'left, transform',
+            transitionDuration: '300ms',
+            transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+          title={isSidebarOpen ? "Collapse Designs" : "Expand Designs"}
+        >
+          {isSidebarOpen ? (
+            <ChevronLeft className="h-4 w-4 text-primary" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-primary" />
+          )}
+        </button>
+
+        {/* Workspace Canvas Area */}
+        <div className="flex-1 bg-muted/5 relative overflow-hidden h-full flex items-center justify-center">
+          <div className="w-full h-full relative">
+            {activeImage ? (
+              <AnnotationCanvas
+                imageUrl={
+                  activeImage.filename.startsWith('http://') || activeImage.filename.startsWith('https://')
+                    ? activeImage.filename
+                    : getImageUrl(activeImage.filename)
+                }
+                boardTitle={activeImage.originalName}
+                comments={showComments ? comments : []}
+                onAddComment={handleAddComment}
+                isCommentMode={isCommentMode}
+                selectedCommentId={selectedCommentId}
+                onSelectComment={setSelectedCommentId}
+                onResolve={handleResolveComment}
+                onEdit={handleEditComment}
+                onDelete={handleDeleteComment}
+                isOwner={isOwner}
+                currentUserId={session?.user?.id}
+                currentGuestName={guestName}
+                redrawingCommentId={redrawingCommentId}
+                redrawingTool={redrawingTool}
+                onRedrawComplete={handleRedrawComplete}
+                onShapeSelect={handleShapeSelect}
+                onColorSelect={handleCommentColorChange}
+                activeTool={activeTool}
+                setActiveTool={setActiveTool}
+                activeColor={activeColor}
+                setActiveColor={setActiveColor}
+                ownerPlan={ownerPlan}
+              />
+            ) : (
+              <div className="text-center text-muted-foreground py-10">
+                Please upload design images to this project.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar Comments Panel */}
+        <aside className="w-full shrink-0 border-t border-border bg-card/50 lg:w-80 lg:border-l lg:border-t-0">
+          <div className="h-[40vh] p-4 lg:h-[calc(100vh-4rem)] lg:p-4">
+            <CommentSidebar
+              comments={comments}
+              selectedCommentId={selectedCommentId}
+              onSelectComment={setSelectedCommentId}
+              onResolve={handleResolveComment}
+              onEdit={handleEditComment}
+              onDelete={handleDeleteComment}
+              isOwner={isOwner}
+              currentUserId={session?.user?.id}
+              currentGuestName={guestName}
+            />
+          </div>
+        </aside>
+      </main>
+
+      {/* Guest Name Modal */}
+      {!session?.user && !guestName && (
+        <GuestNamePrompt onSubmit={handleGuestSubmit} />
+      )}
+
+      {/* Edit Project Modal */}
+      {isOwner && (
+        <EditProjectModal
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          project={project}
+          onProjectUpdated={handleProjectUpdated}
+        />
+      )}
+    </div>
+  )
+}
