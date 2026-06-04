@@ -695,20 +695,22 @@ export function AnnotationCanvas({
 
           {/* Render Saved Comment Shapes with Thicker highly visible stroke lines */}
           {comments.map((comment) => {
-            if (comment.resolved) return null
-
             const isSelected = selectedCommentId === comment.id
-            let shapeColor = '#ef4444'
+            const isResolved = comment.resolved
+            let shapeColor = isResolved ? '#22c55e' : '#ef4444'
             let shapeData: any = null
 
             try {
               if (comment.annotationData) {
                 shapeData = JSON.parse(comment.annotationData)
-                if (shapeData?.color) shapeColor = shapeData.color
+                if (shapeData?.color) {
+                  shapeColor = isResolved ? '#22c55e' : shapeData.color
+                }
               }
             } catch {}
 
             const strokeColor = isSelected ? 'var(--color-primary, #6366f1)' : shapeColor
+            const strokeOpacity = isResolved && !isSelected ? 0.45 : 1.0
 
             // 1. Rectangle Shape
             if (comment.annotationType === 'rectangle' && shapeData) {
@@ -726,6 +728,7 @@ export function AnnotationCanvas({
                   fill={isSelected ? 'rgba(99, 102, 241, 0.05)' : 'transparent'}
                   stroke={strokeColor}
                   strokeWidth={isSelected ? 10.0 : 6.0}
+                  opacity={strokeOpacity}
                   vectorEffect="non-scaling-stroke"
                   className={`transition-all ${
                     isCommentMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
@@ -749,6 +752,7 @@ export function AnnotationCanvas({
                   y2={shapeData.y2Percent}
                   stroke={strokeColor}
                   strokeWidth={isSelected ? 10.0 : 6.0}
+                  opacity={strokeOpacity}
                   vectorEffect="non-scaling-stroke"
                   className={`transition-all ${
                     isCommentMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
@@ -772,6 +776,7 @@ export function AnnotationCanvas({
                   y2={shapeData.y2Percent}
                   stroke={strokeColor}
                   strokeWidth={isSelected ? 10.0 : 6.0}
+                  opacity={strokeOpacity}
                   markerEnd="url(#arrowhead-canvas)"
                   color={strokeColor}
                   vectorEffect="non-scaling-stroke"
@@ -800,6 +805,7 @@ export function AnnotationCanvas({
                   fill={isSelected ? 'rgba(99, 102, 241, 0.05)' : 'transparent'}
                   stroke={strokeColor}
                   strokeWidth={isSelected ? 10.0 : 6.0}
+                  opacity={strokeOpacity}
                   vectorEffect="non-scaling-stroke"
                   className={`transition-all ${
                     isCommentMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
@@ -822,6 +828,7 @@ export function AnnotationCanvas({
                   fill="none"
                   stroke={strokeColor}
                   strokeWidth={isSelected ? 10.0 : 6.0}
+                  opacity={strokeOpacity}
                   vectorEffect="non-scaling-stroke"
                   className={`transition-all ${
                     isCommentMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
@@ -836,6 +843,109 @@ export function AnnotationCanvas({
 
             return null
           })}
+
+          {/* Draft Shape Preview (while user is typing comment in the popover) */}
+          {newPinPosition && newPinPosition.annotationType && newPinPosition.annotationType !== 'pin' && (() => {
+            let shapeData: any = null
+            try {
+              if (newPinPosition.annotationData) {
+                shapeData = JSON.parse(newPinPosition.annotationData)
+              }
+            } catch {}
+
+            if (!shapeData) return null
+
+            const type = newPinPosition.annotationType
+            const xPercent = newPinPosition.xPercent
+            const yPercent = newPinPosition.yPercent
+            const strokeColor = shapeData.color || activeColor
+
+            // 1. Rectangle
+            if (type === 'rectangle') {
+              const x = Math.min(xPercent, shapeData.x2Percent)
+              const y = Math.min(yPercent, shapeData.y2Percent)
+              const w = Math.abs(xPercent - shapeData.x2Percent)
+              const h = Math.abs(yPercent - shapeData.y2Percent)
+              return (
+                <rect
+                  x={x}
+                  y={y}
+                  width={w}
+                  height={h}
+                  fill="rgba(99, 102, 241, 0.05)"
+                  stroke={strokeColor}
+                  strokeWidth={6.0}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )
+            }
+
+            // 2. Line
+            if (type === 'line') {
+              return (
+                <line
+                  x1={xPercent}
+                  y1={yPercent}
+                  x2={shapeData.x2Percent}
+                  y2={shapeData.y2Percent}
+                  stroke={strokeColor}
+                  strokeWidth={6.0}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )
+            }
+
+            // 3. Arrow
+            if (type === 'arrow') {
+              return (
+                <line
+                  x1={xPercent}
+                  y1={yPercent}
+                  x2={shapeData.x2Percent}
+                  y2={shapeData.y2Percent}
+                  stroke={strokeColor}
+                  strokeWidth={6.0}
+                  markerEnd="url(#arrowhead-canvas)"
+                  color={strokeColor}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )
+            }
+
+            // 4. Circle
+            if (type === 'circle') {
+              const rx = Math.abs(shapeData.x2Percent - xPercent)
+              const ry = Math.abs(shapeData.y2Percent - yPercent)
+              return (
+                <ellipse
+                  cx={xPercent}
+                  cy={yPercent}
+                  rx={rx}
+                  ry={ry}
+                  fill="rgba(99, 102, 241, 0.05)"
+                  stroke={strokeColor}
+                  strokeWidth={6.0}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )
+            }
+
+            // 5. Freehand
+            if (type === 'freehand' && Array.isArray(shapeData.points)) {
+              const polyPoints = shapeData.points.map((p: any) => `${p.x},${p.y}`).join(' ')
+              return (
+                <polyline
+                  points={polyPoints}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={6.0}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )
+            }
+
+            return null
+          })()}
 
           {/* Temporary Shape Drag Previews */}
           {isDrawing && drawStart && drawCurrent && (
@@ -910,10 +1020,10 @@ export function AnnotationCanvas({
         </div>
 
       {/* Popover Connector Line (rendered in outer SVG so it is independent of zoom scale) */}
-      {/* Connector lines for all active non-resolved comments */}
+      {/* Connector lines for active non-resolved comments (and selected resolved comments) */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-20">
         {activeComments
-          .filter((c) => !c.resolved && !hiddenCommentIds[c.id])
+          .filter((c) => (!c.resolved || selectedCommentId === c.id) && !hiddenCommentIds[c.id])
           .map((comment) => {
             const calculated = screenPositions[comment.id]
             if (!calculated) return null
@@ -938,6 +1048,10 @@ export function AnnotationCanvas({
             const targetX = baseStartX + (offset.x / outerRect.width) * 100 + (160 / outerRect.width) * 100
             const targetY = baseStartY + (offset.y / outerRect.height) * 100 + (100 / outerRect.height) * 100
 
+            const strokeColor = comment.resolved
+              ? "var(--color-success, #22c55e)"
+              : "var(--color-primary, #6366f1)"
+
             return (
               <line
                 key={`line-${comment.id}`}
@@ -945,8 +1059,9 @@ export function AnnotationCanvas({
                 y1={`${calculated.y}%`}
                 x2={`${targetX}%`}
                 y2={`${targetY}%`}
-                stroke="var(--color-primary, #6366f1)"
+                stroke={strokeColor}
                 strokeWidth={3.5}
+                opacity={comment.resolved ? 0.5 : 1.0}
               />
             )
           })}
@@ -1000,9 +1115,9 @@ export function AnnotationCanvas({
         </div>
       )}
 
-      {/* Active Non-Resolved Comment Popovers (positioned outside zoom container) */}
+      {/* Active Comment Popovers (positioned outside zoom container) */}
       {activeComments
-        .filter((c) => !c.resolved && !hiddenCommentIds[c.id])
+        .filter((c) => (!c.resolved || selectedCommentId === c.id) && !hiddenCommentIds[c.id])
         .map((comment) => {
           const calculated = screenPositions[comment.id]
           if (!calculated) return null
