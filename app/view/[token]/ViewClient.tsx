@@ -311,13 +311,20 @@ export function ViewClient({
 
   const handleResolveComment = useCallback(
     async (id: string) => {
+      const commentToUpdate = project.images
+        .flatMap((img) => img.comments)
+        .find((c) => c.id === id)
+      const nextResolved = !(commentToUpdate?.resolved ?? false)
+
       try {
         const res = await fetch(`/api/comments/${id}?guestName=${guestName || ''}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({}), // Empty body triggers toggle resolved
+          body: JSON.stringify({
+            resolved: nextResolved,
+          }),
         })
 
         if (!res.ok) {
@@ -350,7 +357,7 @@ export function ViewClient({
         toast('error', 'Failed to update comment status.')
       }
     },
-    [activeImageId, guestName, toast]
+    [project.images, activeImageId, guestName, toast]
   )
 
   const handleDeleteComment = useCallback(
