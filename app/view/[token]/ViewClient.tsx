@@ -749,8 +749,13 @@ export function ViewClient({
         </div>
 
           <div className="flex items-center gap-2">
-            {activeImage && (
-              activeImage.filename.startsWith('http') ? (
+            {activeImage && (() => {
+              const lowerFilename = activeImage.filename.toLowerCase().split('?')[0]
+              const isPDF = lowerFilename.endsWith('.pdf')
+              const isImage = /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(lowerFilename) || activeImage.filename.includes('blob.vercel-storage.com')
+              const isLink = (activeImage.filename.startsWith('http://') || activeImage.filename.startsWith('https://')) && !isImage && !isPDF
+
+              return isLink ? (
                 <a
                   href={activeImage.filename}
                   target="_blank"
@@ -772,7 +777,7 @@ export function ViewClient({
                   <span className="hidden sm:inline">Download</span>
                 </a>
               )
-            )}
+            })()}
             {isOwner && (
               <Button
                 variant="secondary"
@@ -861,23 +866,38 @@ export function ViewClient({
                     )}
                   >
                     <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-border/80 bg-muted flex items-center justify-center">
-                      {img.filename.startsWith('http://') || img.filename.startsWith('https://') ? (
-                        <div className="flex flex-col items-center justify-center h-full w-full bg-primary/10 text-primary p-2">
-                          <Globe className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
-                          <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-black mt-1 uppercase select-none">Link</span>
-                        </div>
-                      ) : img.filename.endsWith('.pdf') ? (
-                        <div className="flex flex-col items-center justify-center h-full w-full bg-rose-500/10 text-rose-500 p-2">
-                          <FileText className="h-6 w-6 text-rose-500 group-hover:scale-110 transition-transform" />
-                          <span className="text-[9px] bg-rose-500/20 text-rose-600 px-1.5 py-0.5 rounded font-black mt-1 uppercase select-none">PDF</span>
-                        </div>
-                      ) : (
-                        <img
-                          src={getImageUrl(img.filename)}
-                          alt={img.title}
-                          className="h-full w-full object-contain bg-background/50 group-hover:scale-105 transition-transform duration-300"
-                        />
-                      )}
+                      {(() => {
+                        const lowerFilename = img.filename.toLowerCase().split('?')[0]
+                        const isPDF = lowerFilename.endsWith('.pdf')
+                        const isImage = /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(lowerFilename) || img.filename.includes('blob.vercel-storage.com')
+                        const isLink = (img.filename.startsWith('http://') || img.filename.startsWith('https://')) && !isImage && !isPDF
+
+                        if (isLink) {
+                          return (
+                            <div className="flex flex-col items-center justify-center h-full w-full bg-primary/10 text-primary p-2">
+                              <Globe className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+                              <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-black mt-1 uppercase select-none">Link</span>
+                            </div>
+                          )
+                        }
+
+                        if (isPDF) {
+                          return (
+                            <div className="flex flex-col items-center justify-center h-full w-full bg-rose-500/10 text-rose-500 p-2">
+                              <FileText className="h-6 w-6 text-rose-500 group-hover:scale-110 transition-transform" />
+                              <span className="text-[9px] bg-rose-500/20 text-rose-600 px-1.5 py-0.5 rounded font-black mt-1 uppercase select-none">PDF</span>
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <img
+                            src={getImageUrl(img.filename)}
+                            alt={img.title}
+                            className="h-full w-full object-contain bg-background/50 group-hover:scale-105 transition-transform duration-300"
+                          />
+                        )
+                      })()}
                       {img.comments.length > 0 && (
                         <div className="absolute top-2 right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-tiny-10 font-bold text-white shadow-md">
                           {img.comments.length}

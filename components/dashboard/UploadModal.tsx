@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
+import { upload } from '@vercel/blob/client'
 
 interface UploadModalProps {
   isOpen: boolean
@@ -141,17 +142,35 @@ export function UploadModal({ isOpen, onClose, onUploadComplete }: UploadModalPr
 
     setIsUploading(true)
     try {
-      const formData = new FormData()
-      
       const filesToSend = queue.filter((item) => item.type !== 'link' && item.file).map((item) => item.file!)
       const linksToSend = queue.filter((item) => item.type === 'link').map((item) => ({
         url: item.url,
         title: item.name,
       }))
 
-      filesToSend.forEach((file) => {
-        formData.append('files', file)
-      })
+      // Upload files directly from client to Vercel Blob
+      const uploadedFiles: Array<{ url: string; name: string }> = []
+      
+      for (const file of filesToSend) {
+        const ext = file.name.substring(file.name.lastIndexOf('.'))
+        const uniqueName = `uploads/${Date.now()}-${Math.random().toString(36).substring(2, 10)}${ext}`
+        
+        const blob = await upload(uniqueName, file, {
+          access: 'public',
+          handleUploadUrl: '/api/images/upload/token',
+        })
+        
+        uploadedFiles.push({
+          url: blob.url,
+          name: file.name,
+        })
+      }
+
+      const formData = new FormData()
+      
+      if (uploadedFiles.length > 0) {
+        formData.append('uploadedFiles', JSON.stringify(uploadedFiles))
+      }
 
       if (linksToSend.length > 0) {
         formData.append('links', JSON.stringify(linksToSend))

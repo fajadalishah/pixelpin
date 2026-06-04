@@ -25,7 +25,15 @@ export async function POST(request: Request) {
       }
     } catch {}
 
-    if (files.length === 0 && linksCount === 0) {
+    const uploadedFilesStr = formData.get('uploadedFiles') as string | null
+    let uploadedFiles: Array<{ url: string; name: string }> = []
+    try {
+      if (uploadedFilesStr) {
+        uploadedFiles = JSON.parse(uploadedFilesStr)
+      }
+    } catch {}
+
+    if (files.length === 0 && uploadedFiles.length === 0 && linksCount === 0) {
       return NextResponse.json({ error: 'No files or links provided' }, { status: 400 })
     }
 
@@ -175,6 +183,22 @@ export async function POST(request: Request) {
           title: file.name.replace(ext, ''),
           filename: blobUrl,
           originalName: file.name,
+          width: 1920,
+          height: 1080,
+          projectId: project.id,
+          orderIndex: nextOrderIndex++,
+        },
+      })
+    }
+
+    // Process and save all pre-uploaded client-side files
+    for (const uFile of uploadedFiles) {
+      const ext = uFile.name.substring(uFile.name.lastIndexOf('.'))
+      await prisma.image.create({
+        data: {
+          title: uFile.name.replace(ext, ''),
+          filename: uFile.url,
+          originalName: uFile.name,
           width: 1920,
           height: 1080,
           projectId: project.id,

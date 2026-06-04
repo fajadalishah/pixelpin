@@ -134,8 +134,10 @@ export function ImageCard({
         <a href={`/view/${image.publicToken}`} className="block">
           <div className="relative aspect-video overflow-hidden bg-muted flex items-center justify-center">
             {image.thumbnail ? (() => {
-              const isLink = image.thumbnail.startsWith('http://') || image.thumbnail.startsWith('https://')
-              const isPDF = image.thumbnail.endsWith('.pdf')
+              const lowerThumbnail = image.thumbnail.toLowerCase().split('?')[0]
+              const isPDF = lowerThumbnail.endsWith('.pdf')
+              const isImage = /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(lowerThumbnail) || image.thumbnail.includes('blob.vercel-storage.com')
+              const isLink = (image.thumbnail.startsWith('http://') || image.thumbnail.startsWith('https://')) && !isImage && !isPDF
 
               if (isPDF) {
                 return (
