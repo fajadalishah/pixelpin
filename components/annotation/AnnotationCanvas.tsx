@@ -13,6 +13,7 @@ import {
   ExternalLink,
   FileText,
   Globe,
+  Hand,
 } from 'lucide-react'
 import { CommentPin } from '@/components/annotation/CommentPin'
 import { CommentPopover } from '@/components/annotation/CommentPopover'
@@ -72,7 +73,7 @@ interface AnnotationCanvasProps {
   ownerPlan?: string
 }
 
-type ToolType = 'pin' | 'rectangle' | 'circle' | 'line' | 'arrow' | 'freehand'
+type ToolType = 'pin' | 'rectangle' | 'circle' | 'line' | 'arrow' | 'freehand' | 'pan'
 
 const COLORS = [
   { id: 'red', hex: '#ef4444' },
@@ -201,8 +202,9 @@ export function AnnotationCanvas({
     const isMiddleClick = e.button === 1
     const isRightClick = e.button === 2
     const isLeftClickInBrowse = e.button === 0 && !isCommentMode
+    const isLeftClickInPanTool = e.button === 0 && effectiveTool === 'pan'
 
-    if (isLeftClickInBrowse || isMiddleClick || isRightClick) {
+    if (isLeftClickInBrowse || isMiddleClick || isRightClick || isLeftClickInPanTool) {
       setIsPanning(true)
       setPanStart({
         x: e.clientX - pan.x,
@@ -308,8 +310,8 @@ export function AnnotationCanvas({
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      // Only draw with left click in Comment Mode when tool is not pin
-      if (e.button !== 0 || !isCommentMode || !innerRef.current || effectiveTool === 'pin') return
+      // Only draw with left click in Comment Mode when tool is not pin or pan
+      if (e.button !== 0 || !isCommentMode || !innerRef.current || effectiveTool === 'pin' || effectiveTool === 'pan') return
 
       // Prevent text selection during drag
       e.preventDefault()
@@ -520,6 +522,13 @@ export function AnnotationCanvas({
       onMouseLeave={handlePanMouseUp}
       onContextMenu={(e) => e.preventDefault()}
       className="relative w-full h-full overflow-hidden bg-muted/20 flex items-center justify-center select-none"
+      style={{
+        cursor: isPanning
+          ? 'grabbing'
+          : effectiveTool === 'pan'
+          ? 'grab'
+          : 'default',
+      }}
     >
       {/* Zoomable & Panning Inner Workspace */}
       <div

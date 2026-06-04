@@ -15,7 +15,7 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const { title, imageIds } = body
+    const { title, imageIds, allowDownload } = body
 
     // Verify project exists and check user permissions
     const project = await prisma.project.findUnique({
@@ -61,11 +61,19 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Update title if provided
+    // Update fields if provided
+    const updateData: any = {}
     if (title !== undefined) {
+      updateData.title = title.trim() || 'Untitled Project'
+    }
+    if (allowDownload !== undefined) {
+      updateData.allowDownload = !!allowDownload
+    }
+
+    if (Object.keys(updateData).length > 0) {
       await prisma.project.update({
         where: { id },
-        data: { title: title.trim() || 'Untitled Project' },
+        data: updateData,
       })
     }
 

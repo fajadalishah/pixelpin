@@ -25,6 +25,9 @@ import {
   Zap,
   Globe,
   FileText,
+  Hand,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -44,6 +47,7 @@ import { CommentSidebar } from '@/components/annotation/CommentSidebar'
 import { GuestNamePrompt } from '@/components/annotation/GuestNamePrompt'
 import { EditProjectModal } from '@/components/dashboard/EditProjectModal'
 import { getImageUrl } from '@/lib/image-url'
+import { Modal } from '@/components/ui/Modal'
 
 interface Comment {
   id: string
@@ -82,6 +86,7 @@ interface ProjectDetails {
   createdAt: string
   user: { id: string; name: string }
   images: ImageDetails[]
+  allowDownload: boolean
 }
 
 interface ViewClientProps {
@@ -114,9 +119,14 @@ export function ViewClient({
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [sidebarTab, setSidebarTab] = useState<'designs' | 'revisions'>('designs')
-  const [activeTool, setActiveTool] = useState<'pin' | 'rectangle' | 'circle' | 'line' | 'arrow' | 'freehand'>('pin')
+  const [activeTool, setActiveTool] = useState<'pin' | 'rectangle' | 'circle' | 'line' | 'arrow' | 'freehand' | 'pan'>('pin')
   const [activeColor, setActiveColor] = useState('#ef4444')
   const [showComments, setShowComments] = useState(true)
+
+  // Share settings states
+  const [isShareOpen, setIsShareOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [isSavingShareSettings, setIsSavingShareSettings] = useState(false)
   
   // Redrawing existing comment shapes states
   const [redrawingCommentId, setRedrawingCommentId] = useState<string | null>(null)
@@ -506,9 +516,44 @@ export function ViewClient({
   }
 
   const handleShare = () => {
+    setIsShareOpen(true)
+  }
+
+  const handleCopyLink = () => {
     if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href)
+      const url = window.location.href.split('?')[0]
+      navigator.clipboard.writeText(url)
+      setCopied(true)
       toast('success', 'Project share link copied to clipboard!')
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const handleToggleDownload = async (newValue: boolean) => {
+    setIsSavingShareSettings(true)
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          allowDownload: newValue,
+        }),
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to update download settings')
+      }
+
+      const updatedProject = await res.json()
+      setProject(updatedProject)
+      toast('success', newValue ? 'Downloads allowed for guests' : 'Downloads disallowed for guests')
+    } catch (err) {
+      console.error(err)
+      toast('error', 'Failed to update download settings.')
+    } finally {
+      setIsSavingShareSettings(false)
     }
   }
 
@@ -590,6 +635,7 @@ export function ViewClient({
               {activeTool === 'rectangle' && <Square className="h-4 w-4" />}
               {activeTool === 'circle' && <CircleIcon className="h-4 w-4" />}
               {activeTool === 'freehand' && <Pencil className="h-4 w-4" />}
+              {activeTool === 'pan' && <Hand className="h-4 w-4 text-indigo-500" />}
               <span>Add a Comment</span>
             </button>
 
@@ -672,6 +718,21 @@ export function ViewClient({
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setActiveTool('pan')
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all relative",
+                      activeTool === 'pan'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    )}
+                    title="Hand Move"
+                  >
+                    <Hand className="h-4 w-4" />
+                  </button>
                 </div>
 
                 <div className="h-5 w-px bg-border" />
@@ -727,18 +788,28 @@ export function ViewClient({
               const isImage = /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(lowerFilename) || activeImage.filename.includes('blob.vercel-storage.com')
               const isLink = (activeImage.filename.startsWith('http://') || activeImage.filename.startsWith('https://')) && !isImage && !isPDF
 
-              return isLink ? (
-                <a
-                  href={activeImage.filename}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm animate-fade-in"
-                  title="Open Link"
-                >
-                  <ArrowUpRight className="h-3.5 w-3.5 text-primary" />
-                  <span className="hidden sm:inline">Open Link</span>
-                </a>
-              ) : (
+              const canDownload = project.allowDownload || isOwner
+
+              if (isLink) {
+                return (
+                  <a
+                    href={activeImage.filename}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm animate-fade-in"
+                    title="Open Link"
+                  >
+                    <ArrowUpRight className="h-3.5 w-3.5 text-primary" />
+                    <span className="hidden sm:inline">Open Link</span>
+                  </a>
+                )
+              }
+
+              if (!canDownload) {
+                return null
+              }
+
+              return (
                 <a
                   href={getImageUrl(activeImage.filename)}
                   download={activeImage.originalName}
@@ -1022,6 +1093,78 @@ export function ViewClient({
           onProjectUpdated={handleProjectUpdated}
         />
       )}
+
+      {/* Share Project Modal */}
+      <Modal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        title="Share Project"
+        size="sm"
+      >
+        <div className="space-y-6">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Anyone with this link can view this project and leave comments.
+          </p>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={typeof window !== 'undefined' ? window.location.href.split('?')[0] : ''}
+              className="flex-1 bg-muted/50 border border-border/80 rounded-xl px-3 py-2 text-xs font-semibold text-foreground focus:outline-none select-all truncate"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleCopyLink}
+              className="gap-1 px-3.5"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                  <span>Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Copy</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          {isOwner && (
+            <div className="border-t border-border/50 pt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-bold text-foreground">
+                    Allow Image Downloads
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground leading-normal">
+                    Let guest viewers download the original design files.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={project.allowDownload ?? true}
+                    onChange={(e) => handleToggleDownload(e.target.checked)}
+                    disabled={isSavingShareSettings}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-muted rounded-full peer peer-focus:ring-2 peer-focus:ring-primary/20 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary" />
+                </label>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end border-t border-border/50 pt-4">
+            <Button variant="primary" size="md" onClick={() => setIsShareOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

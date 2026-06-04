@@ -40,13 +40,14 @@ model Subscription {
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  title       String
-  publicToken String   @unique
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  images      Image[]
-  createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  title         String
+  publicToken   String   @unique
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images        Image[]
+  createdAt     DateTime @default(now())
+  allowDownload Boolean  @default(true)
 }
 
 model Image {

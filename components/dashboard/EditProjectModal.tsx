@@ -45,6 +45,7 @@ interface ProjectDetails {
   createdAt: string
   user: { id: string; name: string }
   images: ImageDetails[]
+  allowDownload: boolean
 }
 
 interface EditProjectModalProps {
