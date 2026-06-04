@@ -576,19 +576,12 @@ export function CommentPopover({
                       <button
                         type="button"
                         onClick={() => {
-                          if (ownerPlan === 'free') {
-                            toast('error', 'File attachments are only available on projects created by Starter, Pro, or Business plans.')
-                            return
-                          }
                           fileInputRef.current?.click()
                         }}
-                        className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors cursor-pointer relative"
+                        className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors cursor-pointer"
                         title="Attach File/Image"
                       >
                         <Paperclip className="h-4 w-4" />
-                        {ownerPlan === 'free' && (
-                          <Lock className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 text-amber-500 bg-card rounded-full" />
-                        )}
                       </button>
                       <input
                         ref={fileInputRef}
@@ -849,22 +842,14 @@ export function CommentPopover({
                   )}
                 </div>
 
-                {/* File Attachment Trigger */}
                 <button
                   onClick={() => {
-                    if (ownerPlan === 'free') {
-                      toast('error', 'File attachments are only available on projects created by Starter, Pro, or Business plans.')
-                      return
-                    }
                     fileInputRef.current?.click()
                   }}
-                  className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors relative"
+                  className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted transition-colors"
                   title="Attach File/Image"
                 >
                   <Paperclip className="h-4.5 w-4.5" />
-                  {ownerPlan === 'free' && (
-                    <Lock className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 text-amber-500 bg-card rounded-full" />
-                  )}
                 </button>
                 <input
                   ref={fileInputRef}

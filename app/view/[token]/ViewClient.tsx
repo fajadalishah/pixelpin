@@ -885,9 +885,6 @@ export function ViewClient({
               )}
             >
               Revisions
-              {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                <Lock className="h-3 w-3 text-amber-500" />
-              )}
             </button>
           </div>
 
@@ -958,46 +955,27 @@ export function ViewClient({
             </div>
           ) : (
             /* Revisions / Version History timeline */
-            (ownerPlan === 'free' || ownerPlan === 'starter') ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in">
-                <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shadow-sm">
-                  <Lock className="h-5 w-5" />
-                </div>
-                <h3 className="text-xs font-bold text-foreground">Version History Locked</h3>
-                <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[180px]">
-                  Track design uploads, version iterations, and historical updates. Available on Pro & Business plans.
-                </p>
-                <a
-                  href="/pricing"
-                  className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 px-3.5 py-2 text-[10px] font-bold text-white hover:scale-105 active:scale-95 transition-all shadow-md shadow-purple-500/15 cursor-pointer"
-                >
-                  <Zap className="h-3 w-3" />
-                  Upgrade Plan
-                </a>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 animate-fade-in select-none">
+              <div className="flex items-center gap-2 border-b border-border/60 pb-3 mb-2 shrink-0">
+                <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Revision History</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary">Active</span>
               </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 animate-fade-in select-none">
-                <div className="flex items-center gap-2 border-b border-border/60 pb-3 mb-2 shrink-0">
-                  <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Revision History</span>
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary">Active</span>
+              <div className="relative pl-4 border-l border-border/80 ml-2 space-y-6">
+                {/* Mock Revisions Timeline based on uploaded designs */}
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                  <span className="text-[10px] font-bold text-primary">v1.1 - Current Version</span>
+                  <p className="text-[11px] text-foreground mt-1">Design upload iteration completed.</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5">Uploaded {new Date(project.createdAt).toLocaleDateString()} · by {project.user?.name}</p>
                 </div>
-                <div className="relative pl-4 border-l border-border/80 ml-2 space-y-6">
-                  {/* Mock Revisions Timeline based on uploaded designs */}
-                  <div className="relative">
-                    <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
-                    <span className="text-[10px] font-bold text-primary">v1.1 - Current Version</span>
-                    <p className="text-[11px] text-foreground mt-1">Design upload iteration completed.</p>
-                    <p className="text-[9px] text-muted-foreground mt-0.5">Uploaded {new Date(project.createdAt).toLocaleDateString()} · by {project.user?.name}</p>
-                  </div>
-                  <div className="relative">
-                    <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-muted-foreground/55 ring-4 ring-background" />
-                    <span className="text-[10px] font-bold text-muted-foreground">v1.0 - Initial Upload</span>
-                    <p className="text-[11px] text-foreground mt-1">Project created with {project.images.length} images.</p>
-                    <p className="text-[9px] text-muted-foreground mt-0.5">Created {new Date(project.createdAt).toLocaleDateString()} · by {project.user?.name}</p>
-                  </div>
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-muted-foreground/55 ring-4 ring-background" />
+                  <span className="text-[10px] font-bold text-muted-foreground">v1.0 - Initial Upload</span>
+                  <p className="text-[11px] text-foreground mt-1">Project created with {project.images.length} images.</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5">Created {new Date(project.createdAt).toLocaleDateString()} · by {project.user?.name}</p>
                 </div>
               </div>
-            )
+            </div>
           )}
         </div>
 
