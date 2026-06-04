@@ -615,10 +615,6 @@ export function ViewClient({
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (ownerPlan === 'free' || ownerPlan === 'starter') {
-                        toast('error', 'Advanced annotation shapes (arrows, shapes, drawing) are only available on projects created by Pro or Business plans.')
-                        return
-                      }
                       setActiveTool('arrow')
                     }}
                     className={cn(
@@ -630,17 +626,10 @@ export function ViewClient({
                     title="Arrow Pointer"
                   >
                     <ArrowUpRight className="h-4 w-4" />
-                    {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                      <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
-                    )}
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (ownerPlan === 'free' || ownerPlan === 'starter') {
-                        toast('error', 'Advanced annotation shapes (arrows, shapes, drawing) are only available on projects created by Pro or Business plans.')
-                        return
-                      }
                       setActiveTool('rectangle')
                     }}
                     className={cn(
@@ -652,17 +641,10 @@ export function ViewClient({
                     title="Rectangle Outline"
                   >
                     <Square className="h-4 w-4" />
-                    {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                      <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
-                    )}
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (ownerPlan === 'free' || ownerPlan === 'starter') {
-                        toast('error', 'Advanced annotation shapes (arrows, shapes, drawing) are only available on projects created by Pro or Business plans.')
-                        return
-                      }
                       setActiveTool('circle')
                     }}
                     className={cn(
@@ -674,17 +656,10 @@ export function ViewClient({
                     title="Circle Outline"
                   >
                     <CircleIcon className="h-4 w-4" />
-                    {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                      <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
-                    )}
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (ownerPlan === 'free' || ownerPlan === 'starter') {
-                        toast('error', 'Advanced annotation shapes (arrows, shapes, drawing) are only available on projects created by Pro or Business plans.')
-                        return
-                      }
                       setActiveTool('freehand')
                     }}
                     className={cn(
@@ -696,9 +671,6 @@ export function ViewClient({
                     title="Pencil Draw"
                   >
                     <Pencil className="h-4 w-4" />
-                    {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                      <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
-                    )}
                   </button>
                 </div>
 

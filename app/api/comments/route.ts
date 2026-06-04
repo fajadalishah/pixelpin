@@ -63,13 +63,6 @@ export async function POST(request: Request) {
     })
     const ownerPlan = ownerSubscription?.plan || 'free'
 
-    // Block non-pin annotations for free & starter plans
-    if (annotationType !== 'pin' && (ownerPlan === 'free' || ownerPlan === 'starter')) {
-      return NextResponse.json(
-        { error: 'Advanced annotation shapes are only available on projects created by Pro or Business plans.' },
-        { status: 403 }
-      )
-    }
 
     // Block attachments for free plan
     if (file && file.size > 0 && file.name && ownerPlan === 'free') {

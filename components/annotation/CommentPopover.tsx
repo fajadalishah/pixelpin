@@ -367,22 +367,13 @@ export function CommentPopover({
                       </p>
                       <div className="grid grid-cols-5 gap-1">
                         <button
-                          onClick={() => {
-                            if (ownerPlan === 'free' || ownerPlan === 'starter') {
-                              toast('error', 'Advanced shapes are only available on projects created by Pro or Business plans.')
-                              return
-                            }
-                            handleShapeSelect('arrow')
-                          }}
+                          onClick={() => handleShapeSelect('arrow')}
                           className={`flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted border border-border/40 relative ${
                             comment.annotationType === 'arrow' ? 'bg-primary/20 text-primary border-primary' : 'text-muted-foreground'
                           }`}
                           title="Arrow"
                         >
                           <ArrowUpRight className="h-3.5 w-3.5" />
-                          {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                            <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
-                          )}
                         </button>
                         <button
                           onClick={() => handleShapeSelect('pin')}
@@ -394,58 +385,31 @@ export function CommentPopover({
                           <MapPin className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => {
-                            if (ownerPlan === 'free' || ownerPlan === 'starter') {
-                              toast('error', 'Advanced shapes are only available on projects created by Pro or Business plans.')
-                              return
-                            }
-                            handleShapeSelect('rectangle')
-                          }}
+                          onClick={() => handleShapeSelect('rectangle')}
                           className={`flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted border border-border/40 relative ${
                             comment.annotationType === 'rectangle' ? 'bg-primary/20 text-primary border-primary' : 'text-muted-foreground'
                           }`}
                           title="Rectangle"
                         >
                           <Square className="h-3.5 w-3.5" />
-                          {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                            <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
-                          )}
                         </button>
                         <button
-                          onClick={() => {
-                            if (ownerPlan === 'free' || ownerPlan === 'starter') {
-                              toast('error', 'Advanced shapes are only available on projects created by Pro or Business plans.')
-                              return
-                            }
-                            handleShapeSelect('circle')
-                          }}
+                          onClick={() => handleShapeSelect('circle')}
                           className={`flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted border border-border/40 relative ${
                             comment.annotationType === 'circle' ? 'bg-primary/20 text-primary border-primary' : 'text-muted-foreground'
                           }`}
                           title="Circle"
                         >
                           <CircleIcon className="h-3.5 w-3.5" />
-                          {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                            <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
-                          )}
                         </button>
                         <button
-                          onClick={() => {
-                            if (ownerPlan === 'free' || ownerPlan === 'starter') {
-                              toast('error', 'Advanced shapes are only available on projects created by Pro or Business plans.')
-                              return
-                            }
-                            handleShapeSelect('freehand')
-                          }}
+                          onClick={() => handleShapeSelect('freehand')}
                           className={`flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted border border-border/40 relative ${
                             comment.annotationType === 'freehand' ? 'bg-primary/20 text-primary border-primary' : 'text-muted-foreground'
                           }`}
                           title="Pencil"
                         >
                           <Pencil className="h-3.5 w-3.5" />
-                          {(ownerPlan === 'free' || ownerPlan === 'starter') && (
-                            <Lock className="absolute -top-0.5 -right-0.5 h-2 w-2 text-amber-500 bg-card rounded-full" />
-                          )}
                         </button>
                       </div>
                     </div>
