@@ -128,6 +128,8 @@ export default async function ViewPage({ params }: PageProps) {
         fileUrl: comment.fileUrl,
         fileName: comment.fileName,
         fileType: comment.fileType,
+        annotationType: comment.annotationType,
+        annotationData: comment.annotationData,
         createdAt: comment.createdAt.toISOString(),
         user: comment.user,
       })),
