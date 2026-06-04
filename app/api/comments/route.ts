@@ -202,7 +202,8 @@ export async function POST(request: Request) {
             select: { id: true, email: true, name: true },
           })
 
-          const appBaseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+          const requestUrl = new URL(request.url)
+          const appBaseUrl = `${requestUrl.protocol}//${requestUrl.host}`
           const projectLink = `${appBaseUrl}/view/${project.publicToken}?image=${imageId}&comment=${comment.id}`
 
           for (const recipient of recipients) {

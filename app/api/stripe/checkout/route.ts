@@ -82,7 +82,8 @@ export async function POST(request: Request) {
     }
 
     // Create checkout session
-    const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    const requestUrl = new URL(request.url)
+    const appUrl = `${requestUrl.protocol}//${requestUrl.host}`
 
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,

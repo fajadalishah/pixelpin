@@ -7,7 +7,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2026-05-27.dahlia',
 })
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -41,7 +41,8 @@ export async function POST() {
       return NextResponse.json({ error: 'No billing account found' }, { status: 404 })
     }
 
-    const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    const requestUrl = new URL(request.url)
+    const appUrl = `${requestUrl.protocol}//${requestUrl.host}`
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,

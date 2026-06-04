@@ -79,7 +79,8 @@ export async function POST(request: Request) {
     })
     const companyName = senderOrg?.name || "their workspace"
 
-    const appBaseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+    const requestUrl = new URL(request.url)
+    const appBaseUrl = `${requestUrl.protocol}//${requestUrl.host}`
     const joinLink = `${appBaseUrl}/sign-up?invite=${encodeURIComponent(email)}`
 
     const subject = `You've been invited to join ${companyName} on PixelPin!`
