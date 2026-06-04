@@ -543,8 +543,10 @@ export function AnnotationCanvas({
       >
         {/* Design Image / PDF / Link Card */}
         {(() => {
-          const isLink = imageUrl.startsWith('http://') || imageUrl.startsWith('https://')
-          const isPDF = imageUrl.endsWith('.pdf')
+          const lowerImageUrl = imageUrl.toLowerCase().split('?')[0]
+          const isPDF = lowerImageUrl.endsWith('.pdf')
+          const isImage = /\.(jpeg|jpg|gif|png|webp|svg)$/i.test(lowerImageUrl) || imageUrl.includes('blob.vercel-storage.com')
+          const isLink = (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) && !isImage && !isPDF
 
           if (isPDF) {
             return (
