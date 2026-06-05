@@ -71,6 +71,7 @@ interface AnnotationCanvasProps {
   activeColor: string
   setActiveColor: (color: string) => void
   ownerPlan?: string
+  onViewAttachment?: (url: string, fileName: string, fileType: string) => void
 }
 
 type ToolType = 'pin' | 'rectangle' | 'circle' | 'line' | 'arrow' | 'freehand' | 'pan'
@@ -122,6 +123,7 @@ export function AnnotationCanvas({
   activeColor,
   setActiveColor,
   ownerPlan = 'free',
+  onViewAttachment,
 }: AnnotationCanvasProps) {
   const outerContainerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
@@ -1151,6 +1153,7 @@ export function AnnotationCanvas({
               onColorSelect={onColorSelect}
               isSelected={isSelected}
               ownerPlan={ownerPlan}
+              onViewAttachment={onViewAttachment}
             />
           )
         })}
@@ -1169,6 +1172,7 @@ export function AnnotationCanvas({
             onSubmit={handleNewCommentSubmit}
             onClose={handleCloseNewComment}
             ownerPlan={ownerPlan}
+            onViewAttachment={onViewAttachment}
           />
         )
       })()}

@@ -30,7 +30,7 @@ import {
   Check,
   Trash2,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, forceDownload, getAttachmentUrl } from '@/lib/utils'
 
 const COLORS = [
   { id: 'red', hex: '#ef4444' },
@@ -127,6 +127,15 @@ export function ViewClient({
   const [localStatus, setLocalStatus] = useState<string>('')
   const [newStatusName, setNewStatusName] = useState('')
   const [isSavingStatuses, setIsSavingStatuses] = useState(false)
+  const [previewAttachment, setPreviewAttachment] = useState<{
+    url: string
+    name: string
+    type: string
+  } | null>(null)
+
+  const handleViewAttachment = useCallback((url: string, fileName: string, fileType: string) => {
+    setPreviewAttachment({ url, name: fileName, type: fileType })
+  }, [])
 
   // Sync manage status states
   useEffect(() => {
@@ -1092,6 +1101,7 @@ export function ViewClient({
                     ? activeImage.filename
                     : getImageUrl(activeImage.filename)
                 }
+                onViewAttachment={handleViewAttachment}
                 boardTitle={activeImage.originalName}
                 comments={showComments ? comments : []}
                 onAddComment={handleAddComment}
@@ -1136,6 +1146,7 @@ export function ViewClient({
               isOwner={isOwner}
               currentUserId={session?.user?.id}
               currentGuestName={guestName}
+              onViewAttachment={handleViewAttachment}
             />
           </div>
         </aside>
@@ -1384,6 +1395,76 @@ export function ViewClient({
           </div>
         </div>
       </Modal>
+
+      {/* Lightbox Preview Modal */}
+      {previewAttachment && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setPreviewAttachment(null)}
+        >
+          <div
+            className="relative max-w-4xl w-full max-h-[90vh] bg-card rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-muted/20">
+              <div className="min-w-0 pr-4">
+                <h3 className="text-sm font-semibold text-foreground truncate">
+                  {previewAttachment.name}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {previewAttachment.type !== 'link' && (
+                  <button
+                    onClick={() => forceDownload(previewAttachment.url, previewAttachment.name)}
+                    className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm shadow-primary/10 cursor-pointer"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Download</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setPreviewAttachment(null)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground transition-all hover:bg-accent cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Body */}
+            <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-muted/5 min-h-[300px]">
+              {previewAttachment.type?.startsWith('image/') ? (
+                <img
+                  src={previewAttachment.url}
+                  alt={previewAttachment.name}
+                  className="max-h-[70vh] object-contain rounded-lg shadow-md"
+                />
+              ) : previewAttachment.type === 'application/pdf' ? (
+                <iframe
+                  src={previewAttachment.url}
+                  className="w-full h-[70vh] border-0 rounded-lg"
+                  title="PDF Preview"
+                />
+              ) : (
+                <div className="text-center p-6 space-y-3">
+                  <FileText className="h-12 w-12 text-primary mx-auto animate-pulse" />
+                  <p className="text-sm font-medium text-foreground">
+                    No preview available for this file type.
+                  </p>
+                  <button
+                    onClick={() => forceDownload(previewAttachment.url, previewAttachment.name)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Download File</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -14,7 +14,7 @@ import {
   Paperclip,
   Globe,
 } from 'lucide-react'
-import { cn, formatRelativeTime, getAttachmentUrl } from '@/lib/utils'
+import { cn, formatRelativeTime, getAttachmentUrl, forceDownload } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 
 interface Comment {
@@ -46,6 +46,7 @@ interface CommentSidebarProps {
   isOwner: boolean
   currentUserId?: string | null
   currentGuestName?: string | null
+  onViewAttachment?: (url: string, fileName: string, fileType: string) => void
 }
 
 const EMOJIS = ['👍', '❤️', '🎉', '😂', '🚀', '👀', '🔥', '👏', '💡', '❓']
@@ -60,6 +61,7 @@ export function CommentSidebar({
   isOwner,
   currentUserId = null,
   currentGuestName = null,
+  onViewAttachment,
 }: CommentSidebarProps) {
   const [filter, setFilter] = useState<FilterTab>('all')
   const [isEditingId, setIsEditingId] = useState<string | null>(null)
@@ -429,7 +431,10 @@ export function CommentSidebar({
                               onClick={(e) => e.stopPropagation()}
                             >
                               {/* Thumbnail / File representation */}
-                              <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted/30 border border-border/80 flex items-center justify-center">
+                              <div
+                                onClick={() => onViewAttachment?.(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'Attachment', comment.fileType!)}
+                                className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted/30 border border-border/80 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
+                              >
                                 {comment.fileType?.startsWith('image/') ? (
                                   <img
                                     src={getAttachmentUrl(comment.fileUrl)}
@@ -457,20 +462,20 @@ export function CommentSidebar({
                               <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/40">
                                 <button
                                   type="button"
-                                  onClick={() => window.open(getAttachmentUrl(comment.fileUrl), '_blank')}
+                                  onClick={() => onViewAttachment?.(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'Attachment', comment.fileType!)}
                                   className="flex-1 py-1 rounded bg-secondary text-[9px] font-bold text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors text-center border border-border/60 cursor-pointer"
                                 >
                                   View
                                 </button>
                                 {comment.fileType !== 'link' && (
-                                  <a
-                                    href={getAttachmentUrl(comment.fileUrl)}
-                                    download={comment.fileName || 'attachment'}
+                                  <button
+                                    type="button"
+                                    onClick={() => forceDownload(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'attachment')}
                                     className="flex-1 py-1 rounded bg-primary text-[9px] font-bold text-primary-foreground hover:bg-primary/90 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-primary/10 cursor-pointer"
                                   >
                                     <Download className="h-2.5 w-2.5" />
                                     <span>Download</span>
-                                  </a>
+                                  </button>
                                 )}
                               </div>
                             </div>

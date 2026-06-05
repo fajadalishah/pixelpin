@@ -21,7 +21,7 @@ import {
   Lock,
   Globe,
 } from 'lucide-react'
-import { cn, formatRelativeTime, getAttachmentUrl } from '@/lib/utils'
+import { cn, formatRelativeTime, getAttachmentUrl, forceDownload } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 
@@ -62,6 +62,7 @@ interface CommentPopoverProps {
   onColorSelect?: (commentId: string, colorHex: string) => void
   isSelected?: boolean
   ownerPlan?: string
+  onViewAttachment?: (url: string, fileName: string, fileType: string) => void
 }
 
 const EMOJIS = ['👍', '❤️', '🎉', '😂', '🚀', '👀', '🔥', '👏', '💡', '❓']
@@ -92,6 +93,7 @@ export function CommentPopover({
   onColorSelect,
   isSelected = false,
   ownerPlan = 'free',
+  onViewAttachment,
 }: CommentPopoverProps) {
   const { toast } = useToast()
   const [content, setContent] = useState('')
@@ -679,29 +681,76 @@ export function CommentPopover({
                       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
                     </a>
                   ) : comment.fileType?.startsWith('image/') ? (
-                    <a
-                      href={getAttachmentUrl(comment.fileUrl)}
-                      download={comment.fileName || 'attachment'}
-                      className="block overflow-hidden rounded-lg border border-border hover:opacity-90 transition-opacity"
-                    >
-                      <img
-                        src={getAttachmentUrl(comment.fileUrl)}
-                        alt="attachment"
-                        className="max-h-36 w-full object-cover"
-                      />
-                    </a>
+                    <div className="rounded-xl border border-border bg-muted/40 p-2 space-y-2">
+                      <div
+                        onClick={() => onViewAttachment?.(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'Attachment', comment.fileType!)}
+                        className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted/30 border border-border/80 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
+                      >
+                        <img
+                          src={getAttachmentUrl(comment.fileUrl)}
+                          alt={comment.fileName || 'attachment'}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 pr-1">
+                        <p className="truncate text-[10px] font-bold text-foreground" title={comment.fileName || 'Attachment'}>
+                          {comment.fileName || 'Attachment'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/40">
+                        <button
+                          type="button"
+                          onClick={() => onViewAttachment?.(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'Attachment', comment.fileType!)}
+                          className="flex-1 py-1 rounded bg-secondary text-[9px] font-bold text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors text-center border border-border/60 cursor-pointer"
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => forceDownload(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'attachment')}
+                          className="flex-1 py-1 rounded bg-primary text-[9px] font-bold text-primary-foreground hover:bg-primary/90 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-primary/10 cursor-pointer"
+                        >
+                          <Download className="h-2.5 w-2.5" />
+                          <span>Download</span>
+                        </button>
+                      </div>
+                    </div>
                   ) : (
-                    <a
-                      href={getAttachmentUrl(comment.fileUrl)}
-                      download={comment.fileName || 'attachment'}
-                      className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 p-2 text-xs hover:bg-secondary/60 transition-colors"
-                    >
-                      <FileText className="h-4 w-4 shrink-0 text-primary" />
-                      <span className="truncate flex-1 text-foreground font-medium" title={comment.fileName || 'Attachment'}>
-                        {comment.fileName || 'Attachment'}
-                      </span>
-                      <Download className="h-3 w-3 text-muted-foreground" />
-                    </a>
+                    <div className="rounded-xl border border-border bg-muted/40 p-2 space-y-2">
+                      <div
+                        onClick={() => onViewAttachment?.(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'Attachment', comment.fileType!)}
+                        className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted/30 border border-border/80 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
+                      >
+                        <div className="flex flex-col items-center justify-center p-2 text-center">
+                          <FileText className="h-5 w-5 text-primary mb-1" />
+                          <span className="text-[9px] font-black bg-primary/20 text-primary px-1.5 py-0.2 rounded uppercase select-none">
+                            File
+                          </span>
+                        </div>
+                      </div>
+                      <div className="min-w-0 pr-1">
+                        <p className="truncate text-[10px] font-bold text-foreground" title={comment.fileName || 'Attachment'}>
+                          {comment.fileName || 'Attachment'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/40">
+                        <button
+                          type="button"
+                          onClick={() => onViewAttachment?.(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'Attachment', comment.fileType!)}
+                          className="flex-1 py-1 rounded bg-secondary text-[9px] font-bold text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors text-center border border-border/60 cursor-pointer"
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => forceDownload(getAttachmentUrl(comment.fileUrl!), comment.fileName || 'attachment')}
+                          className="flex-1 py-1 rounded bg-primary text-[9px] font-bold text-primary-foreground hover:bg-primary/90 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-primary/10 cursor-pointer"
+                        >
+                          <Download className="h-2.5 w-2.5" />
+                          <span>Download</span>
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

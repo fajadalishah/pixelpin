@@ -30,3 +30,29 @@ export function getAttachmentUrl(url: string | null): string {
   }
   return url
 }
+
+export async function forceDownload(url: string, filename: string) {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('Network response was not ok')
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(blobUrl)
+  } catch (err) {
+    console.error('Download failed:', err)
+    // Fallback: try opening/saving using standard link click
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.target = '_blank'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+}
