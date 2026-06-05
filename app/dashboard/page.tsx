@@ -47,11 +47,14 @@ import {
   Zap,
   Link2,
   Files,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { ImageCard } from '@/components/dashboard/ImageCard'
+import { ProjectListRow } from '@/components/dashboard/ProjectListRow'
 import { UploadModal } from '@/components/dashboard/UploadModal'
 import { cn } from '@/lib/utils'
 import { useRef } from 'react'
@@ -157,6 +160,7 @@ export default function DashboardPage() {
   const { toast } = useToast()
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'size'>('newest')
   const [groupBy, setGroupBy] = useState<'none' | 'status'>('none')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived'>('active')
   const [isBulkActionPending, setIsBulkActionPending] = useState(false)
@@ -1232,6 +1236,34 @@ export default function DashboardPage() {
                         <option value="status">Status</option>
                       </select>
                     </div>
+
+                    {/* View Mode Toggle (Grid/List) */}
+                    <div className="flex items-center gap-1 rounded-xl bg-muted/30 border border-border/80 p-0.5 select-none">
+                      <button
+                        onClick={() => setViewMode('grid')}
+                        className={cn(
+                          "flex h-7 w-7 items-center justify-center rounded-lg transition-all cursor-pointer",
+                          viewMode === 'grid'
+                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        )}
+                        title="Grid View"
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={cn(
+                          "flex h-7 w-7 items-center justify-center rounded-lg transition-all cursor-pointer",
+                          viewMode === 'list'
+                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        )}
+                        title="List View"
+                      >
+                        <List className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
                     {projectView === 'my' ? filteredProjects.length : filteredTeamProjects.length} projects
@@ -1269,6 +1301,19 @@ export default function DashboardPage() {
                             
                             {statusProjs.length === 0 ? (
                               <p className="text-xs text-muted-foreground/60 italic pl-2">No projects in this status.</p>
+                            ) : viewMode === 'list' ? (
+                              <div className="space-y-3">
+                                {statusProjs.map((project) => (
+                                  <ProjectListRow
+                                    key={project.id}
+                                    project={project}
+                                    onDelete={stats.userRole !== 'Reviewer' ? handleDelete : undefined}
+                                    selected={selectedProjectIds.includes(project.id)}
+                                    onSelectToggle={stats.userRole !== 'Reviewer' ? handleSelectToggle : undefined}
+                                    isSelectionActive={selectedProjectIds.length > 0}
+                                  />
+                                ))}
+                              </div>
                             ) : (
                               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                                 {statusProjs.map((project) => (
@@ -1284,6 +1329,19 @@ export default function DashboardPage() {
                               </div>
                             )}
                           </div>
+                        ))}
+                      </div>
+                    ) : viewMode === 'list' ? (
+                      <div className="space-y-3">
+                        {filteredProjects.map((project) => (
+                          <ProjectListRow
+                            key={project.id}
+                            project={project}
+                            onDelete={stats.userRole !== 'Reviewer' ? handleDelete : undefined}
+                            selected={selectedProjectIds.includes(project.id)}
+                            onSelectToggle={stats.userRole !== 'Reviewer' ? handleSelectToggle : undefined}
+                            isSelectionActive={selectedProjectIds.length > 0}
+                          />
                         ))}
                       </div>
                     ) : (
@@ -1349,6 +1407,19 @@ export default function DashboardPage() {
                             
                             {statusProjs.length === 0 ? (
                               <p className="text-xs text-muted-foreground/60 italic pl-2">No company projects in this status.</p>
+                            ) : viewMode === 'list' ? (
+                              <div className="space-y-3">
+                                {statusProjs.map((project) => (
+                                  <ProjectListRow
+                                    key={project.id}
+                                    project={project}
+                                    onDelete={(stats.userRole === 'Owner' || stats.userRole === 'Admin' || (stats.userRole === 'Collaborator' && project.owner?.isMe)) ? handleDelete : undefined}
+                                    selected={selectedProjectIds.includes(project.id)}
+                                    onSelectToggle={(stats.userRole === 'Owner' || stats.userRole === 'Admin' || (stats.userRole === 'Collaborator' && project.owner?.isMe)) ? handleSelectToggle : undefined}
+                                    isSelectionActive={selectedProjectIds.length > 0}
+                                  />
+                                ))}
+                              </div>
                             ) : (
                               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                                 {statusProjs.map((project) => (
@@ -1387,6 +1458,19 @@ export default function DashboardPage() {
                               </div>
                             )}
                           </div>
+                        ))}
+                      </div>
+                    ) : viewMode === 'list' ? (
+                      <div className="space-y-3">
+                        {filteredTeamProjects.map((project) => (
+                          <ProjectListRow
+                            key={project.id}
+                            project={project}
+                            onDelete={(stats.userRole === 'Owner' || stats.userRole === 'Admin' || (stats.userRole === 'Collaborator' && project.owner?.isMe)) ? handleDelete : undefined}
+                            selected={selectedProjectIds.includes(project.id)}
+                            onSelectToggle={(stats.userRole === 'Owner' || stats.userRole === 'Admin' || (stats.userRole === 'Collaborator' && project.owner?.isMe)) ? handleSelectToggle : undefined}
+                            isSelectionActive={selectedProjectIds.length > 0}
+                          />
                         ))}
                       </div>
                     ) : (

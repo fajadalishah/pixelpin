@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MessageSquare, Link2, Trash2, Calendar, Files, Globe, FileText } from 'lucide-react'
+import { MessageSquare, Link2, Trash2, Calendar, Files, Globe, FileText, Eye } from 'lucide-react'
 import { cn, formatRelativeTime } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import { getImageUrl } from '@/lib/image-url'
@@ -230,6 +230,13 @@ export function ImageCard({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1">
+            <a
+              href={`/view/${image.publicToken}`}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary"
+              title="View project"
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </a>
             <button
               onClick={handleCopyLink}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary"
