@@ -49,3 +49,6 @@ public/uploads/
 public/comments/
 exported_users.json
 logs/
+
+.vercel
+.env*

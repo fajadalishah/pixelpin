@@ -123,6 +123,7 @@ export function ViewClient({
   const [guestName, setGuestName] = useState<string | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isCommentsSidebarOpen, setIsCommentsSidebarOpen] = useState(true)
   const [sidebarTab, setSidebarTab] = useState<'designs' | 'revisions'>('designs')
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [localStatuses, setLocalStatuses] = useState<string[]>([])
@@ -1320,6 +1321,25 @@ export function ViewClient({
           )}
         </button>
 
+        {/* Circular Slide Toggle Button placed right on the comments border/dragging line */}
+        <button
+          onClick={() => setIsCommentsSidebarOpen(!isCommentsSidebarOpen)}
+          className="absolute top-1/2 -translate-y-1/2 z-20 hidden lg:flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card shadow-lg transition-all hover:bg-accent text-foreground hover:scale-110 active:scale-95 cursor-pointer"
+          style={{
+            right: isCommentsSidebarOpen ? 'calc(24rem - 14px)' : '4px',
+            transitionProperty: 'right, transform',
+            transitionDuration: '300ms',
+            transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+          title={isCommentsSidebarOpen ? "Collapse Comments" : "Expand Comments"}
+        >
+          {isCommentsSidebarOpen ? (
+            <ChevronRight className="h-4 w-4 text-primary" />
+          ) : (
+            <ChevronLeft className="h-4 w-4 text-primary" />
+          )}
+        </button>
+
         {/* Workspace Canvas Area */}
         <div className="flex-1 bg-muted/5 relative overflow-hidden h-full flex flex-col items-center justify-center">
           {viewingImageId && viewingImageId !== activeImage?.id && (
@@ -1375,9 +1395,14 @@ export function ViewClient({
           </div>
         </div>
 
-        {/* Sidebar Comments Panel */}
-        <aside className="w-full shrink-0 border-t border-border bg-card/50 lg:border-l lg:border-t-0 lg:w-96">
-          <div className="h-[40vh] p-4 lg:h-[calc(100vh-4rem)] lg:p-4">
+        {/* Collapsible Right Comments Sidebar */}
+        <aside
+          className={cn(
+            "relative flex flex-col h-full border-t border-border bg-card/50 backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0 lg:border-t-0 lg:border-l-4",
+            isCommentsSidebarOpen ? "w-full lg:w-96" : "w-0 overflow-hidden border-t-0 lg:border-l-0"
+          )}
+        >
+          <div className="h-[40vh] p-4 lg:h-[calc(100vh-4rem)] lg:p-4 lg:w-96 shrink-0">
             <CommentSidebar
               comments={comments}
               selectedCommentId={selectedCommentId}
