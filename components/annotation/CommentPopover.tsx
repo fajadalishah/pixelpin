@@ -21,7 +21,7 @@ import {
   Lock,
   Globe,
 } from 'lucide-react'
-import { cn, formatRelativeTime } from '@/lib/utils'
+import { cn, formatRelativeTime, getAttachmentUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 
@@ -667,7 +667,7 @@ export function CommentPopover({
                 <div className="mt-2">
                   {comment.fileType === 'link' ? (
                     <a
-                      href={comment.fileUrl}
+                      href={getAttachmentUrl(comment.fileUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 rounded-lg border border-border bg-gradient-to-r from-primary/5 to-accent/5 p-2 text-xs hover:from-primary/10 hover:to-accent/10 transition-colors"
@@ -680,19 +680,19 @@ export function CommentPopover({
                     </a>
                   ) : comment.fileType?.startsWith('image/') ? (
                     <a
-                      href={comment.fileUrl}
+                      href={getAttachmentUrl(comment.fileUrl)}
                       download={comment.fileName || 'attachment'}
                       className="block overflow-hidden rounded-lg border border-border hover:opacity-90 transition-opacity"
                     >
                       <img
-                        src={comment.fileUrl}
+                        src={getAttachmentUrl(comment.fileUrl)}
                         alt="attachment"
                         className="max-h-36 w-full object-cover"
                       />
                     </a>
                   ) : (
                     <a
-                      href={comment.fileUrl}
+                      href={getAttachmentUrl(comment.fileUrl)}
                       download={comment.fileName || 'attachment'}
                       className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 p-2 text-xs hover:bg-secondary/60 transition-colors"
                     >

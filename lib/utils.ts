@@ -17,3 +17,16 @@ export function formatRelativeTime(date: Date | string): string {
 export function cn(...classes: (string | undefined | false | null)[]): string {
   return classes.filter(Boolean).join(' ')
 }
+
+export function getAttachmentUrl(url: string | null): string {
+  if (!url) return ''
+  if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) {
+    try {
+      const parsed = new URL(url)
+      return parsed.pathname
+    } catch {
+      // ignore
+    }
+  }
+  return url
+}

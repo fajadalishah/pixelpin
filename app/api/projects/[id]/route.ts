@@ -15,7 +15,7 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const { title, imageIds, allowDownload, status, statuses } = body
+    const { title, imageIds, imageRenames, allowDownload, status, statuses } = body
 
     // Verify project exists and check user permissions
     const project = await prisma.project.findUnique({
@@ -83,16 +83,42 @@ export async function PATCH(
       })
     }
 
-    // Update images orderIndex if provided
+    // Update images orderIndex and originalName if provided
     if (imageIds && Array.isArray(imageIds)) {
+      const renameMap = new Map<string, string>()
+      if (imageRenames && Array.isArray(imageRenames)) {
+        imageRenames.forEach((rename: any) => {
+          if (rename && typeof rename.id === 'string' && typeof rename.originalName === 'string') {
+            renameMap.set(rename.id, rename.originalName)
+          }
+        })
+      }
+
       await prisma.$transaction(
-        imageIds.map((imgId, idx) =>
-          prisma.image.update({
+        imageIds.map((imgId, idx) => {
+          const updateData: any = { orderIndex: idx }
+          const newName = renameMap.get(imgId)
+          if (newName !== undefined) {
+            updateData.originalName = newName
+          }
+          return prisma.image.update({
             where: {
               id: imgId,
               projectId: id, // enforce scoped update
             },
-            data: { orderIndex: idx },
+            data: updateData,
+          })
+        })
+      )
+    } else if (imageRenames && Array.isArray(imageRenames)) {
+      await prisma.$transaction(
+        imageRenames.map((rename: any) =>
+          prisma.image.update({
+            where: {
+              id: rename.id,
+              projectId: id,
+            },
+            data: { originalName: rename.originalName },
           })
         )
       )

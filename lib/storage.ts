@@ -24,10 +24,9 @@ export async function uploadToBlob(file: File | Buffer, filename: string, option
 
       fs.writeFileSync(targetPath, buffer)
       
-      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
       // Normalize slashes for URL path
       const urlPath = filename.replace(/\\/g, '/')
-      return `${baseUrl}/${urlPath}`
+      return `/${urlPath}`
     } catch (err) {
       console.error('Local file upload fallback failed:', err)
       throw err
@@ -47,13 +46,14 @@ export async function deleteFromBlob(url: string): Promise<void> {
 
     // If Vercel Blob token is missing, fall back to local file deletion
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      let relativePath = url
       const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
       if (url.startsWith(baseUrl)) {
-        const relativePath = url.replace(baseUrl, '')
-        const filePath = path.join(process.cwd(), 'public', relativePath)
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath)
-        }
+        relativePath = url.replace(baseUrl, '')
+      }
+      const filePath = path.join(process.cwd(), 'public', relativePath)
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
       }
       return
     }

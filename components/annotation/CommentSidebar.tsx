@@ -14,7 +14,7 @@ import {
   Paperclip,
   Globe,
 } from 'lucide-react'
-import { cn, formatRelativeTime } from '@/lib/utils'
+import { cn, formatRelativeTime, getAttachmentUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 
 interface Comment {
@@ -432,7 +432,7 @@ export function CommentSidebar({
                               <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted/30 border border-border/80 flex items-center justify-center">
                                 {comment.fileType?.startsWith('image/') ? (
                                   <img
-                                    src={comment.fileUrl}
+                                    src={getAttachmentUrl(comment.fileUrl)}
                                     alt={comment.fileName || 'attachment'}
                                     className="h-full w-full object-cover"
                                   />
@@ -457,14 +457,14 @@ export function CommentSidebar({
                               <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/40">
                                 <button
                                   type="button"
-                                  onClick={() => window.open(comment.fileUrl!, '_blank')}
+                                  onClick={() => window.open(getAttachmentUrl(comment.fileUrl), '_blank')}
                                   className="flex-1 py-1 rounded bg-secondary text-[9px] font-bold text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors text-center border border-border/60 cursor-pointer"
                                 >
                                   View
                                 </button>
                                 {comment.fileType !== 'link' && (
                                   <a
-                                    href={comment.fileUrl}
+                                    href={getAttachmentUrl(comment.fileUrl)}
                                     download={comment.fileName || 'attachment'}
                                     className="flex-1 py-1 rounded bg-primary text-[9px] font-bold text-primary-foreground hover:bg-primary/90 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-primary/10 cursor-pointer"
                                   >

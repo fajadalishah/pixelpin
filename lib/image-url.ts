@@ -5,7 +5,17 @@
  */
 export function getImageUrl(filename: string): string {
   if (!filename) return ''
-  if (filename.startsWith('http://') || filename.startsWith('https://')) {
+  
+  if (filename.startsWith('http://localhost') || filename.startsWith('http://127.0.0.1')) {
+    try {
+      const url = new URL(filename)
+      return url.pathname
+    } catch {
+      // ignore
+    }
+  }
+
+  if (filename.startsWith('http://') || filename.startsWith('https://') || filename.startsWith('/')) {
     return filename
   }
   return `/uploads/${filename}`
