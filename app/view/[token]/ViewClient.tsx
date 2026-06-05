@@ -124,6 +124,33 @@ export function ViewClient({
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isCommentsSidebarOpen, setIsCommentsSidebarOpen] = useState(true)
+
+  // Collapse designs sidebar on mobile viewports initially
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsSidebarOpen(false)
+    }
+  }, [])
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev
+      if (next && typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setIsCommentsSidebarOpen(false)
+      }
+      return next
+    })
+  }, [])
+
+  const toggleCommentsSidebar = useCallback(() => {
+    setIsCommentsSidebarOpen((prev) => {
+      const next = !prev
+      if (next && typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setIsSidebarOpen(false)
+      }
+      return next
+    })
+  }, [])
   const [sidebarTab, setSidebarTab] = useState<'designs' | 'revisions'>('designs')
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [localStatuses, setLocalStatuses] = useState<string[]>([])
@@ -730,28 +757,30 @@ export function ViewClient({
       style={brandAccentStyle}
     >
       {/* View Header */}
-      <header className="sticky top-0 z-40 h-16 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl flex flex-col justify-center">
+        {/* Top Row (Desktop Header / Mobile Main Header) */}
+        <div className="mx-auto flex h-14 lg:h-16 w-full max-w-7xl items-center justify-between px-3 sm:px-6">
+          {/* Left: Back Arrow, Brand, Title */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Link
               href={session ? '/dashboard' : '/'}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+              className="flex h-8 w-8 lg:h-9 lg:w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
 
             {/* Organization Branding Identity */}
             {ownerOrganization && (ownerPlan === 'business' || ownerPlan === 'pro' || ownerPlan === 'starter') && (
-              <div className="flex items-center gap-2 border-r border-border pr-3 h-8 mr-1 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 border-r border-border pr-2 sm:pr-3 h-8 mr-0.5 sm:mr-1 shrink-0">
                 {ownerOrganization.logoUrl ? (
-                  <img src={ownerOrganization.logoUrl} alt="Logo" className="h-6 w-6 rounded object-cover" />
+                  <img src={ownerOrganization.logoUrl} alt="Logo" className="h-5 w-5 sm:h-6 sm:w-6 rounded object-cover" />
                 ) : (
-                  <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">
+                  <div className="h-5 w-5 sm:h-6 sm:w-6 rounded bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">
                     {ownerOrganization.name.charAt(0).toUpperCase()}
                   </div>
                 )}
-                <div className="flex flex-col select-none leading-none">
-                  <span className="text-[11px] font-bold text-foreground truncate max-w-[80px]" title={ownerOrganization.name}>
+                <div className="hidden xs:flex flex-col select-none leading-none">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-foreground truncate max-w-[70px] sm:max-w-[80px]" title={ownerOrganization.name}>
                     {ownerOrganization.name}
                   </span>
                   {ownerPlan !== 'business' && (
@@ -761,243 +790,239 @@ export function ViewClient({
               </div>
             )}
 
-            <div className="flex items-center gap-3">
-              <div>
-                <h1 className="max-w-[160px] truncate text-sm font-semibold sm:max-w-[260px]" title={project.title}>
-                  {project.title}
-                </h1>
-                <p className="hidden text-tiny-10 text-muted-foreground sm:block">
-                  Project shared by {project.user?.name}
-                </p>
-              </div>
-
-              {/* Status Select Badge */}
-              {project.status && (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <div className="relative select-none">
-                    <select
-                      value={project.status}
-                      onChange={async (e) => {
-                        const newStatus = e.target.value
-                        try {
-                          const res = await fetch(`/api/view/${project.publicToken}`, {
-                            method: 'PATCH',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ status: newStatus }),
-                          })
-                          if (!res.ok) {
-                            throw new Error('Failed to update status')
-                          }
-                          const updatedProject = await res.json()
-                          setProject(updatedProject)
-                          toast('success', `Project status updated to "${newStatus}"`)
-                        } catch (err) {
-                          console.error(err)
-                          toast('error', 'Failed to update project status')
+            <div className="min-w-0">
+              <h1 className="max-w-[120px] xs:max-w-[160px] sm:max-w-[260px] truncate text-xs sm:text-sm font-semibold" title={project.title}>
+                {project.title}
+              </h1>
+              <p className="hidden text-[9px] text-muted-foreground sm:block leading-none mt-0.5">
+                Shared by {project.user?.name}
+              </p>
+            </div>
+            
+            {/* Desktop Status Select */}
+            {project.status && (
+              <div className="hidden lg:flex items-center gap-1.5 shrink-0 ml-2">
+                <div className="relative select-none">
+                  <select
+                    value={project.status}
+                    onChange={async (e) => {
+                      const newStatus = e.target.value
+                      try {
+                        const res = await fetch(`/api/view/${project.publicToken}`, {
+                          method: 'PATCH',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({ status: newStatus }),
+                        })
+                        if (!res.ok) {
+                          throw new Error('Failed to update status')
                         }
+                        const updatedProject = await res.json()
+                        setProject(updatedProject)
+                        toast('success', `Project status updated to "${newStatus}"`)
+                      } catch (err) {
+                        console.error(err)
+                        toast('error', 'Failed to update project status')
+                      }
+                    }}
+                    className={cn(
+                      "rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition-all cursor-pointer outline-none focus:ring-2 focus:ring-primary/20",
+                      project.status === "Approved" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20",
+                      project.status === "Revision Needed" && "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20",
+                      project.status === "In Review" && "bg-blue-500/10 border-blue-500/20 text-blue-500 hover:bg-blue-500/20",
+                      project.status === "In Progress" && "bg-slate-500/10 border-slate-500/20 text-slate-400 dark:text-slate-300 hover:bg-slate-500/20",
+                      !["Approved", "Revision Needed", "In Review", "In Progress"].includes(project.status) && "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
+                    )}
+                    title="Change project status"
+                  >
+                    {(project.statuses || ["In Progress", "In Review", "Revision Needed", "Approved"]).map((st) => (
+                      <option key={st} value={st} className="bg-background text-foreground font-semibold">
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={() => setIsStatusModalOpen(true)}
+                  className="p-1.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer"
+                  title="Manage Status Choices"
+                >
+                  <Pencil className="h-3 w-3 text-primary" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Toolbar (Hidden on Mobile) */}
+          <div className="hidden lg:flex items-center gap-2">
+            {/* Add Comment, Show/Hide comments, Mobile sidebars */}
+            <div className="relative flex flex-col items-center">
+              <button
+                onClick={() => {
+                  setIsCommentMode(!isCommentMode)
+                  setRedrawingCommentId(null)
+                  setRedrawingTool(null)
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold border transition-all hover:scale-105 active:scale-95 shadow-sm",
+                  isCommentMode
+                    ? "bg-primary text-primary-foreground border-primary shadow-primary/25 animate-pulse"
+                    : "bg-card border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                {activeTool === 'pin' && <MapPin className="h-4 w-4 text-rose-500" />}
+                {activeTool === 'arrow' && <ArrowUpRight className="h-4 w-4" />}
+                {activeTool === 'rectangle' && <Square className="h-4 w-4" />}
+                {activeTool === 'circle' && <CircleIcon className="h-4 w-4" />}
+                {activeTool === 'freehand' && <Pencil className="h-4 w-4" />}
+                {activeTool === 'pan' && <Hand className="h-4 w-4 text-indigo-500" />}
+                <span>Add a Comment</span>
+              </button>
+
+              {/* Desktop Annotation Dropdown Panel */}
+              {isCommentMode && (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2.5 z-55 flex items-center gap-3 rounded-2xl border border-border bg-card/95 px-3 py-2 shadow-2xl backdrop-blur-xl animate-fade-in pointer-events-auto">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('pin')
                       }}
                       className={cn(
-                        "rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition-all cursor-pointer outline-none focus:ring-2 focus:ring-primary/20",
-                        project.status === "Approved" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20",
-                        project.status === "Revision Needed" && "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20",
-                        project.status === "In Review" && "bg-blue-500/10 border-blue-500/20 text-blue-500 hover:bg-blue-500/20",
-                        project.status === "In Progress" && "bg-slate-500/10 border-slate-500/20 text-slate-400 dark:text-slate-300 hover:bg-slate-500/20",
-                        !["Approved", "Revision Needed", "In Review", "In Progress"].includes(project.status) && "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
+                        "p-1.5 rounded-lg transition-all",
+                        activeTool === 'pin'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                       )}
-                      title="Change project status"
+                      title="Dot Pin"
                     >
-                      {(project.statuses || ["In Progress", "In Review", "Revision Needed", "Approved"]).map((st) => (
-                        <option key={st} value={st} className="bg-background text-foreground font-semibold">
-                          {st}
-                        </option>
-                      ))}
-                    </select>
+                      <MapPin className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('arrow')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all relative",
+                        activeTool === 'arrow'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                      title="Arrow Pointer"
+                    >
+                      <ArrowUpRight className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('rectangle')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all relative",
+                        activeTool === 'rectangle'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                      title="Rectangle Outline"
+                    >
+                      <Square className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('circle')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all relative",
+                        activeTool === 'circle'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                      title="Circle Outline"
+                    >
+                      <CircleIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('freehand')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all relative",
+                        activeTool === 'freehand'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                      title="Pencil Draw"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('pan')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all relative",
+                        activeTool === 'pan'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                      title="Hand Move"
+                    >
+                      <Hand className="h-4 w-4" />
+                    </button>
                   </div>
-                  
-                  {/* Status Settings Pencil Trigger */}
-                  <button
-                    onClick={() => setIsStatusModalOpen(true)}
-                    className="p-1.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer"
-                    title="Manage Status Choices"
-                  >
-                    <Pencil className="h-3 w-3 text-primary" />
-                  </button>
+
+                  <div className="h-5 w-px bg-border" />
+
+                  {/* Color swatches */}
+                  <div className="flex items-center gap-1.5">
+                    {COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveColor(c.hex)
+                        }}
+                        className={cn(
+                          "h-4.5 w-4.5 rounded-full border transition-all",
+                          activeColor === c.hex
+                            ? 'ring-2 ring-primary ring-offset-2 scale-110 border-transparent'
+                            : 'border-border hover:scale-105'
+                        )}
+                        style={{ backgroundColor: c.hex }}
+                        title={`Color ${c.id}`}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Controls: Add Comment & Show/Hide Comments */}
-          <div className="flex items-center gap-2">
-            {/* Add a Comment Mode Switcher */}
-            <div className="relative flex flex-col items-center">
             <button
-              onClick={() => {
-                setIsCommentMode(!isCommentMode)
-                setRedrawingCommentId(null)
-                setRedrawingTool(null)
-              }}
+              onClick={() => setShowComments(!showComments)}
               className={cn(
-                "flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold border transition-all hover:scale-105 active:scale-95 shadow-sm",
-                isCommentMode
-                  ? "bg-primary text-primary-foreground border-primary shadow-primary/25 animate-pulse"
-                  : "bg-card border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                "flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold border transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer",
+                showComments
+                  ? "bg-card border-border text-foreground hover:bg-accent hover:text-foreground"
+                  : "bg-muted border-border/80 text-muted-foreground hover:text-foreground"
               )}
+              title={showComments ? "Hide Comment Pins" : "Show Comment Pins"}
             >
-              {activeTool === 'pin' && <MapPin className="h-4 w-4 text-rose-500" />}
-              {activeTool === 'arrow' && <ArrowUpRight className="h-4 w-4" />}
-              {activeTool === 'rectangle' && <Square className="h-4 w-4" />}
-              {activeTool === 'circle' && <CircleIcon className="h-4 w-4" />}
-              {activeTool === 'freehand' && <Pencil className="h-4 w-4" />}
-              {activeTool === 'pan' && <Hand className="h-4 w-4 text-indigo-500" />}
-              <span>Add a Comment</span>
+              {showComments ? (
+                <Eye className="h-4 w-4 text-primary" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
+              <span>{showComments ? "Hide Pins" : "Show Pins"}</span>
             </button>
-
-            {/* Annotation Dropdown Panel from the Button */}
-            {isCommentMode && (
-              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2.5 z-55 flex items-center gap-3 rounded-2xl border border-border bg-card/95 px-3 py-2 shadow-2xl backdrop-blur-xl animate-fade-in pointer-events-auto">
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveTool('pin')
-                    }}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-all",
-                      activeTool === 'pin'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                    title="Dot Pin"
-                  >
-                    <MapPin className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveTool('arrow')
-                    }}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-all relative",
-                      activeTool === 'arrow'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                    title="Arrow Pointer"
-                  >
-                    <ArrowUpRight className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveTool('rectangle')
-                    }}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-all relative",
-                      activeTool === 'rectangle'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                    title="Rectangle Outline"
-                  >
-                    <Square className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveTool('circle')
-                    }}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-all relative",
-                      activeTool === 'circle'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                    title="Circle Outline"
-                  >
-                    <CircleIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveTool('freehand')
-                    }}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-all relative",
-                      activeTool === 'freehand'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                    title="Pencil Draw"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveTool('pan')
-                    }}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-all relative",
-                      activeTool === 'pan'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                    title="Hand Move"
-                  >
-                    <Hand className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="h-5 w-px bg-border" />
-
-                {/* Color swatches */}
-                <div className="flex items-center gap-1.5">
-                  {COLORS.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setActiveColor(c.hex)
-                      }}
-                      className={cn(
-                        "h-4.5 w-4.5 rounded-full border transition-all",
-                        activeColor === c.hex
-                          ? 'ring-2 ring-primary ring-offset-2 scale-110 border-transparent'
-                          : 'border-border hover:scale-105'
-                      )}
-                      style={{ backgroundColor: c.hex }}
-                      title={`Color ${c.id}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Show/Hide Comments Toggle */}
-          <button
-            onClick={() => setShowComments(!showComments)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold border transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer",
-              showComments
-                ? "bg-card border-border text-foreground hover:bg-accent hover:text-foreground"
-                : "bg-muted border-border/80 text-muted-foreground hover:text-foreground"
-            )}
-            title={showComments ? "Hide Comment Pins" : "Show Comment Pins"}
-          >
-            {showComments ? (
-              <Eye className="h-4 w-4 text-primary" />
-            ) : (
-              <EyeOff className="h-4 w-4" />
-            )}
-            <span>{showComments ? "Hide Pins" : "Show Pins"}</span>
-          </button>
-        </div>
-
-          <div className="flex items-center gap-2">
+          {/* Right side controls (Desktop + Mobile essentials) */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {activeImage && (() => {
               const lowerFilename = activeImage.filename.toLowerCase().split('?')[0]
               const isPDF = lowerFilename.endsWith('.pdf')
@@ -1012,11 +1037,10 @@ export function ViewClient({
                     href={activeImage.filename}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm animate-fade-in"
+                    className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm"
                     title="Open Link"
                   >
-                    <ArrowUpRight className="h-3.5 w-3.5 text-primary" />
-                    <span className="hidden sm:inline">Open Link</span>
+                    <ArrowUpRight className="h-4 w-4 text-primary" />
                   </a>
                 )
               }
@@ -1029,34 +1053,31 @@ export function ViewClient({
                 <a
                   href={getImageUrl(activeImage.filename)}
                   download={activeImage.originalName}
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm animate-fade-in"
+                  className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm"
                   title="Download Active Design"
                 >
-                  <Download className="h-3.5 w-3.5 text-primary" />
-                  <span className="hidden sm:inline">Download</span>
+                  <Download className="h-4 w-4 text-primary" />
                 </a>
               )
             })()}
             {isOwner && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setIsEditOpen(true)}
-                className="gap-1.5 flex"
-              >
-                <Settings className="h-3.5 w-3.5 text-primary" />
-                Edit Project
-              </Button>
+              <>
+                <button
+                  onClick={() => setIsEditOpen(true)}
+                  className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm"
+                  title="Edit Project"
+                >
+                  <Settings className="h-4 w-4 text-primary" />
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground hover:scale-105 shadow-sm"
+                  title="Share Project"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
+              </>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleShare}
-              className="hidden gap-1.5 sm:flex"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              Share Project
-            </Button>
             <ThemeToggle />
             {!session?.user && (
               <Link href="/sign-in" className="hidden sm:block">
@@ -1067,6 +1088,244 @@ export function ViewClient({
             )}
           </div>
         </div>
+
+        {/* Bottom Row (Mobile Only Toolbar) */}
+        <div className="flex lg:hidden h-10 border-t border-border/40 bg-muted/5 items-center justify-between px-3 w-full">
+          {/* Mobile Sidebar toggles (Designs and Comments) */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={toggleSidebar}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg border transition-all active:scale-95 shadow-sm cursor-pointer",
+                isSidebarOpen
+                  ? "bg-primary text-primary-foreground border-primary shadow-primary/20"
+                  : "bg-card border-border text-muted-foreground hover:bg-accent"
+              )}
+              title="Toggle Designs"
+            >
+              <Files className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={toggleCommentsSidebar}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg border transition-all active:scale-95 shadow-sm cursor-pointer",
+                isCommentsSidebarOpen
+                  ? "bg-primary text-primary-foreground border-primary shadow-primary/20"
+                  : "bg-card border-border text-muted-foreground hover:bg-accent"
+              )}
+              title="Toggle Comments"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Mobile Annotation Controls (Add Comment & Show Pins) */}
+          <div className="flex items-center gap-1.5 relative">
+            <div className="relative flex flex-col items-center">
+              <button
+                onClick={() => {
+                  setIsCommentMode(!isCommentMode)
+                  setRedrawingCommentId(null)
+                  setRedrawingTool(null)
+                }}
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg border transition-all active:scale-95 shadow-sm cursor-pointer",
+                  isCommentMode
+                    ? "bg-primary text-primary-foreground border-primary shadow-primary/25 animate-pulse"
+                    : "bg-card border-border text-muted-foreground hover:bg-accent"
+                )}
+                title="Add Comment"
+              >
+                {activeTool === 'pin' && <MapPin className="h-3.5 w-3.5 text-rose-500" />}
+                {activeTool === 'arrow' && <ArrowUpRight className="h-3.5 w-3.5" />}
+                {activeTool === 'rectangle' && <Square className="h-3.5 w-3.5" />}
+                {activeTool === 'circle' && <CircleIcon className="h-3.5 w-3.5" />}
+                {activeTool === 'freehand' && <Pencil className="h-3.5 w-3.5" />}
+                {activeTool === 'pan' && <Hand className="h-3.5 w-3.5 text-indigo-500" />}
+              </button>
+
+              {/* Mobile Annotation Dropdown Panel (Horizontal and centered below header) */}
+              {isCommentMode && (
+                <div className="fixed top-[92px] left-1/2 -translate-x-1/2 z-55 flex items-center gap-2.5 rounded-2xl border border-border bg-card/95 px-2.5 py-1.5 shadow-2xl backdrop-blur-xl animate-fade-in max-w-[95vw] overflow-x-auto">
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('pin')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        activeTool === 'pin'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('arrow')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        activeTool === 'arrow'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('rectangle')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        activeTool === 'rectangle'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <Square className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('circle')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        activeTool === 'circle'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <CircleIcon className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('freehand')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        activeTool === 'freehand'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setActiveTool('pan')
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        activeTool === 'pan'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <Hand className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="h-4.5 w-px bg-border" />
+
+                  <div className="flex items-center gap-1.5">
+                    {COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveColor(c.hex)
+                        }}
+                        className={cn(
+                          "h-4 w-4 rounded-full border transition-all",
+                          activeColor === c.hex
+                            ? 'ring-1.5 ring-primary ring-offset-1 scale-110 border-transparent'
+                            : 'border-border hover:scale-105'
+                        )}
+                        style={{ backgroundColor: c.hex }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowComments(!showComments)}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg border transition-all active:scale-95 shadow-sm cursor-pointer",
+                showComments
+                  ? "bg-card border-border text-foreground hover:bg-accent"
+                  : "bg-muted border-border/80 text-muted-foreground hover:text-foreground"
+              )}
+              title={showComments ? "Hide Pins" : "Show Pins"}
+            >
+              {showComments ? (
+                <Eye className="h-3.5 w-3.5 text-primary" />
+              ) : (
+                <EyeOff className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+
+          {/* Mobile Status Select */}
+          {project.status && (
+            <div className="flex items-center gap-1 shrink-0 select-none">
+              <select
+                value={project.status}
+                onChange={async (e) => {
+                  const newStatus = e.target.value
+                  try {
+                    const res = await fetch(`/api/view/${project.publicToken}`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ status: newStatus }),
+                    })
+                    if (!res.ok) {
+                      throw new Error('Failed to update status')
+                    }
+                    const updatedProject = await res.json()
+                    setProject(updatedProject)
+                    toast('success', `Project status updated to "${newStatus}"`)
+                  } catch (err) {
+                    console.error(err)
+                    toast('error', 'Failed to update project status')
+                  }
+                }}
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-bold border transition-all cursor-pointer outline-none",
+                  project.status === "Approved" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
+                  project.status === "Revision Needed" && "bg-amber-500/10 border-amber-500/20 text-amber-500",
+                  project.status === "In Review" && "bg-blue-500/10 border-blue-500/20 text-blue-500",
+                  project.status === "In Progress" && "bg-slate-500/10 border-slate-500/20 text-slate-400 dark:text-slate-300",
+                  !["Approved", "Revision Needed", "In Review", "In Progress"].includes(project.status) && "bg-primary/10 border-primary/20 text-primary"
+                )}
+              >
+                {(project.statuses || ["In Progress", "In Review", "Revision Needed", "Approved"]).map((st) => (
+                  <option key={st} value={st} className="bg-background text-foreground font-semibold">
+                    {st}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setIsStatusModalOpen(true)}
+                className="p-1 rounded-full border border-border bg-card text-muted-foreground hover:bg-accent transition-all cursor-pointer"
+              >
+                <Pencil className="h-2.5 w-2.5 text-primary" />
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Main Annotation Workspace */}
@@ -1074,8 +1333,10 @@ export function ViewClient({
         {/* Collapsible Left Designs Sidebar */}
         <div
           className={cn(
-            "relative flex flex-col h-full border-r-4 border-border bg-card/50 backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0",
-            isSidebarOpen ? "w-64" : "w-0 overflow-hidden border-r-0"
+            "relative flex flex-col bg-card/50 backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0",
+            isSidebarOpen
+              ? "w-full h-[180px] border-b-4 border-border lg:w-64 lg:h-full lg:border-r-4 lg:border-b-0"
+              : "w-full h-0 overflow-hidden border-b-0 lg:w-0 lg:h-full lg:border-r-0"
           )}
         >
           {/* Tab Switcher: Designs vs Revisions */}
@@ -1107,7 +1368,7 @@ export function ViewClient({
           {/* Sidebar Tab Contents */}
           {sidebarTab === 'designs' ? (
             /* Grid list of designs */
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-x-auto overflow-y-hidden p-3 flex flex-row gap-3 lg:overflow-y-auto lg:overflow-x-hidden lg:flex-col lg:p-4 lg:space-y-3 lg:space-x-0">
               {project.images.map((img) => {
                 const isActive = img.id === activeImageId
                 return (
@@ -1115,7 +1376,7 @@ export function ViewClient({
                     key={img.id}
                     onClick={() => handleImageSwitch(img.id)}
                     className={cn(
-                      "group relative cursor-pointer rounded-xl border overflow-hidden bg-muted/20 transition-all p-1.5",
+                      "group relative cursor-pointer rounded-xl border overflow-hidden bg-muted/20 transition-all p-1.5 shrink-0 w-[140px] lg:w-full",
                       isActive
                         ? "ring-2 ring-primary border-primary bg-primary/5"
                         : "border-border/60 hover:border-primary/50 hover:bg-accent/40"
@@ -1304,10 +1565,10 @@ export function ViewClient({
 
         {/* Circular Slide Toggle Button placed right on the border/dragging line */}
         <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="absolute top-1/2 -translate-y-1/2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card shadow-lg transition-all hover:bg-accent text-foreground hover:scale-110 active:scale-95 cursor-pointer"
+          onClick={toggleSidebar}
+          className="absolute top-1/2 -translate-y-1/2 z-25 hidden lg:flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 hover:border-primary/50 bg-card shadow-xl transition-all hover:bg-accent text-primary hover:scale-110 active:scale-95 cursor-pointer"
           style={{
-            left: isSidebarOpen ? 'calc(16rem - 14px)' : '4px',
+            left: isSidebarOpen ? 'calc(16rem - 18px)' : '6px',
             transitionProperty: 'left, transform',
             transitionDuration: '300ms',
             transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1315,18 +1576,18 @@ export function ViewClient({
           title={isSidebarOpen ? "Collapse Designs" : "Expand Designs"}
         >
           {isSidebarOpen ? (
-            <ChevronLeft className="h-4 w-4 text-primary" />
+            <ChevronLeft className="h-5 w-5" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-primary" />
+            <ChevronRight className="h-5 w-5" />
           )}
         </button>
 
         {/* Circular Slide Toggle Button placed right on the comments border/dragging line */}
         <button
-          onClick={() => setIsCommentsSidebarOpen(!isCommentsSidebarOpen)}
-          className="absolute top-1/2 -translate-y-1/2 z-20 hidden lg:flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card shadow-lg transition-all hover:bg-accent text-foreground hover:scale-110 active:scale-95 cursor-pointer"
+          onClick={toggleCommentsSidebar}
+          className="absolute top-1/2 -translate-y-1/2 z-25 hidden lg:flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 hover:border-primary/50 bg-card shadow-xl transition-all hover:bg-accent text-primary hover:scale-110 active:scale-95 cursor-pointer"
           style={{
-            right: isCommentsSidebarOpen ? 'calc(24rem - 14px)' : '4px',
+            right: isCommentsSidebarOpen ? 'calc(24rem - 18px)' : '6px',
             transitionProperty: 'right, transform',
             transitionDuration: '300ms',
             transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1334,9 +1595,9 @@ export function ViewClient({
           title={isCommentsSidebarOpen ? "Collapse Comments" : "Expand Comments"}
         >
           {isCommentsSidebarOpen ? (
-            <ChevronRight className="h-4 w-4 text-primary" />
+            <ChevronRight className="h-5 w-5" />
           ) : (
-            <ChevronLeft className="h-4 w-4 text-primary" />
+            <ChevronLeft className="h-5 w-5" />
           )}
         </button>
 
@@ -1398,11 +1659,13 @@ export function ViewClient({
         {/* Collapsible Right Comments Sidebar */}
         <aside
           className={cn(
-            "relative flex flex-col h-full border-t border-border bg-card/50 backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0 lg:border-t-0 lg:border-l-4",
-            isCommentsSidebarOpen ? "w-full lg:w-96" : "w-0 overflow-hidden border-t-0 lg:border-l-0"
+            "relative flex flex-col bg-card/50 backdrop-blur-xl transition-all duration-300 ease-in-out shrink-0",
+            isCommentsSidebarOpen
+              ? "w-full h-[350px] border-t border-border lg:w-96 lg:h-full lg:border-l-4 lg:border-t-0"
+              : "w-full h-0 overflow-hidden border-t-0 lg:w-0 lg:h-full lg:border-l-0"
           )}
         >
-          <div className="h-[40vh] p-4 lg:h-[calc(100vh-4rem)] lg:p-4 lg:w-96 shrink-0">
+          <div className="h-full w-full p-3 lg:p-4 lg:h-[calc(100vh-4rem)] lg:w-96 shrink-0 flex flex-col">
             <CommentSidebar
               comments={comments}
               selectedCommentId={selectedCommentId}
