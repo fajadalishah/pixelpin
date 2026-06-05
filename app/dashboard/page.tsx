@@ -64,6 +64,8 @@ interface ProjectData {
   imageCount: number
   commentCount: number
   thumbnail: string | null
+  status?: string
+  statuses?: string[]
 }
 
 interface TeamMemberData {
@@ -154,6 +156,7 @@ export default function DashboardPage() {
   const [isWorkspaceOwner, setIsWorkspaceOwner] = useState(false)
   const { toast } = useToast()
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'size'>('newest')
+  const [groupBy, setGroupBy] = useState<'none' | 'status'>('none')
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([])
   const [archiveFilter, setArchiveFilter] = useState<'active' | 'archived'>('active')
   const [isBulkActionPending, setIsBulkActionPending] = useState(false)
@@ -358,6 +361,35 @@ export default function DashboardPage() {
       return archiveFilter === 'active' ? !isArchived : isArchived
     })
   }, [sortedTeamProjects, archiveFilter])
+
+  const getGroupedProjects = useCallback(<T extends ProjectData>(items: T[]) => {
+    const uniqueStatuses = Array.from(
+      new Set(items.map((p) => p.status || 'In Progress'))
+    )
+    const order = ['In Progress', 'In Review', 'Revision Needed', 'Approved']
+    uniqueStatuses.sort((a, b) => {
+      const idxA = order.indexOf(a)
+      const idxB = order.indexOf(b)
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB
+      if (idxA !== -1) return -1
+      if (idxB !== -1) return 1
+      return a.localeCompare(b)
+    })
+    return uniqueStatuses.map((st) => ({
+      statusName: st,
+      projects: items.filter((p) => (p.status || 'In Progress') === st),
+    }))
+  }, [])
+
+  const groupedProjects = useMemo(() => {
+    if (groupBy !== 'status') return []
+    return getGroupedProjects(filteredProjects)
+  }, [filteredProjects, groupBy, getGroupedProjects])
+
+  const groupedTeamProjects = useMemo(() => {
+    if (groupBy !== 'status') return []
+    return getGroupedProjects(filteredTeamProjects)
+  }, [filteredTeamProjects, groupBy, getGroupedProjects])
 
   const handleSelectToggle = useCallback((id: string) => {
     setSelectedProjectIds((prev) =>
@@ -1188,6 +1220,18 @@ export default function DashboardPage() {
                         <option value="size">Most Images</option>
                       </select>
                     </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Group by</span>
+                      <select
+                        value={groupBy}
+                        onChange={(e) => setGroupBy(e.target.value as 'none' | 'status')}
+                        className="rounded-lg border border-border bg-muted/30 px-3 py-1.5 text-[11px] font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer"
+                      >
+                        <option value="none">None</option>
+                        <option value="status">Status</option>
+                      </select>
+                    </div>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
                     {projectView === 'my' ? filteredProjects.length : filteredTeamProjects.length} projects
@@ -1203,31 +1247,44 @@ export default function DashboardPage() {
                           <SkeletonCard key={i} />
                         ))}
                       </div>
-                    ) : filteredProjects.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-24 rounded-3xl border border-dashed border-border/80 bg-card/40 backdrop-blur-xl animate-fade-in">
-                        <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/10 text-primary animate-float mb-6">
-                          {archiveFilter === 'active' ? <Upload className="h-9 w-9" /> : <FolderKanban className="h-9 w-9" />}
-                        </div>
-                        <h2 className="text-xl font-bold text-foreground">
-                          {archiveFilter === 'active' ? 'Create your first project' : 'No archived projects'}
-                        </h2>
-                        <p className="mt-2 max-w-sm text-center text-xs text-muted-foreground leading-relaxed">
-                          {archiveFilter === 'active' 
-                            ? 'Get started by creating a project and uploading your designs. You can then share the link and collect pin-pointed feedback from anyone.'
-                            : 'Select active projects and click "Archive" in the bulk action bar to move them here.'
-                          }
-                        </p>
-                        {archiveFilter === 'active' && stats.userRole !== 'Reviewer' && (
-                          <Button
-                            variant="primary"
-                            size="lg"
-                            className="mt-6 shadow-lg shadow-primary/25"
-                            onClick={handleCreateProjectClick}
-                          >
-                            <ImageIcon className="h-5 w-5" />
-                            Create Project
-                          </Button>
-                        )}
+                    ) : groupBy === 'status' ? (
+                      <div className="space-y-8">
+                        {groupedProjects.map(({ statusName, projects: statusProjs }) => (
+                          <div key={statusName} className="space-y-4 animate-fade-in">
+                            <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                              <span className={cn(
+                                "rounded-full px-2.5 py-0.5 text-[10px] font-black border uppercase tracking-wider",
+                                statusName === "Approved" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
+                                statusName === "Revision Needed" && "bg-amber-500/10 border-amber-500/20 text-amber-500",
+                                statusName === "In Review" && "bg-blue-500/10 border-blue-500/20 text-blue-500",
+                                statusName === "In Progress" && "bg-slate-500/10 border-slate-500/20 text-slate-400 dark:text-slate-300",
+                                !["Approved", "Revision Needed", "In Review", "In Progress"].includes(statusName) && "bg-primary/10 border-primary/20 text-primary"
+                              )}>
+                                {statusName}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground font-bold">
+                                ({statusProjs.length})
+                              </span>
+                            </div>
+                            
+                            {statusProjs.length === 0 ? (
+                              <p className="text-xs text-muted-foreground/60 italic pl-2">No projects in this status.</p>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                                {statusProjs.map((project) => (
+                                  <ImageCard 
+                                    key={project.id} 
+                                    image={project} 
+                                    onDelete={stats.userRole !== 'Reviewer' ? handleDelete : undefined}
+                                    selected={selectedProjectIds.includes(project.id)}
+                                    onSelectToggle={stats.userRole !== 'Reviewer' ? handleSelectToggle : undefined}
+                                    isSelectionActive={selectedProjectIds.length > 0}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -1269,6 +1326,68 @@ export default function DashboardPage() {
                             : 'Select active company projects and click "Archive" in the bulk action bar to move them here.'
                           }
                         </p>
+                      </div>
+                    ) : groupBy === 'status' ? (
+                      <div className="space-y-8">
+                        {groupedTeamProjects.map(({ statusName, projects: statusProjs }) => (
+                          <div key={statusName} className="space-y-4 animate-fade-in">
+                            <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                              <span className={cn(
+                                "rounded-full px-2.5 py-0.5 text-[10px] font-black border uppercase tracking-wider",
+                                statusName === "Approved" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
+                                statusName === "Revision Needed" && "bg-amber-500/10 border-amber-500/20 text-amber-500",
+                                statusName === "In Review" && "bg-blue-500/10 border-blue-500/20 text-blue-500",
+                                statusName === "In Progress" && "bg-slate-500/10 border-slate-500/20 text-slate-400 dark:text-slate-300",
+                                !["Approved", "Revision Needed", "In Review", "In Progress"].includes(statusName) && "bg-primary/10 border-primary/20 text-primary"
+                              )}>
+                                {statusName}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground font-bold">
+                                ({statusProjs.length})
+                              </span>
+                            </div>
+                            
+                            {statusProjs.length === 0 ? (
+                              <p className="text-xs text-muted-foreground/60 italic pl-2">No company projects in this status.</p>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                                {statusProjs.map((project) => (
+                                  <div key={project.id} className="relative group">
+                                    <ImageCard 
+                                      image={project} 
+                                      onDelete={(stats.userRole === 'Owner' || stats.userRole === 'Admin' || (stats.userRole === 'Collaborator' && project.owner?.isMe)) ? handleDelete : undefined}
+                                      selected={selectedProjectIds.includes(project.id)}
+                                      onSelectToggle={(stats.userRole === 'Owner' || stats.userRole === 'Admin' || (stats.userRole === 'Collaborator' && project.owner?.isMe)) ? handleSelectToggle : undefined}
+                                      isSelectionActive={selectedProjectIds.length > 0}
+                                    />
+                                    {/* Owner Badge */}
+                                    {project.owner && (
+                                      <div className={cn(
+                                        "absolute top-3 z-10 transition-all duration-300",
+                                        selectedProjectIds.length > 0 || selectedProjectIds.includes(project.id) ? "left-12" : "left-3 group-hover:left-12"
+                                      )}>
+                                        <div className={cn(
+                                          'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold shadow-sm backdrop-blur-md',
+                                          project.owner.isMe
+                                            ? 'bg-primary/90 text-white'
+                                            : 'bg-card/90 border border-border text-foreground'
+                                        )}>
+                                          <div className={cn(
+                                            'h-4 w-4 rounded-full flex items-center justify-center text-[8px] font-black',
+                                            project.owner.isMe ? 'bg-white/20 text-white' : 'bg-primary/15 text-primary'
+                                          )}>
+                                            {project.owner.name.charAt(0).toUpperCase()}
+                                          </div>
+                                          {project.owner.isMe ? 'You' : project.owner.name}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

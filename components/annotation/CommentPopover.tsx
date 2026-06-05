@@ -248,7 +248,11 @@ export function CommentPopover({
         alert('Attachment too large. Maximum size is 5MB.')
         return
       }
-      setFile(selectedFile)
+      if (isEditing) {
+        setEditFile(selectedFile)
+      } else {
+        setFile(selectedFile)
+      }
     }
   }
 

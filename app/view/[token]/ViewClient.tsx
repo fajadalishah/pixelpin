@@ -28,6 +28,7 @@ import {
   Hand,
   Copy,
   Check,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -87,6 +88,8 @@ interface ProjectDetails {
   user: { id: string; name: string }
   images: ImageDetails[]
   allowDownload: boolean
+  status: string
+  statuses: string[]
 }
 
 interface ViewClientProps {
@@ -119,6 +122,20 @@ export function ViewClient({
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [sidebarTab, setSidebarTab] = useState<'designs' | 'revisions'>('designs')
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+  const [localStatuses, setLocalStatuses] = useState<string[]>([])
+  const [localStatus, setLocalStatus] = useState<string>('')
+  const [newStatusName, setNewStatusName] = useState('')
+  const [isSavingStatuses, setIsSavingStatuses] = useState(false)
+
+  // Sync manage status states
+  useEffect(() => {
+    if (isStatusModalOpen) {
+      setLocalStatuses(project.statuses || ["In Progress", "In Review", "Revision Needed", "Approved"])
+      setLocalStatus(project.status || 'In Progress')
+      setNewStatusName('')
+    }
+  }, [isStatusModalOpen, project.statuses, project.status])
   const [activeTool, setActiveTool] = useState<'pin' | 'rectangle' | 'circle' | 'line' | 'arrow' | 'freehand' | 'pan'>('pin')
   const [activeColor, setActiveColor] = useState('#ef4444')
   const [showComments, setShowComments] = useState(true)
@@ -223,7 +240,8 @@ export function ViewClient({
         })
 
         if (!res.ok) {
-          throw new Error('Failed to save comment')
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || 'Failed to save comment')
         }
 
         const newComment = await res.json()
@@ -240,9 +258,9 @@ export function ViewClient({
 
         setSelectedCommentId(newComment.id)
         toast('success', 'Comment pinned successfully!')
-      } catch (err) {
+      } catch (err: any) {
         console.error(err)
-        toast('error', 'Could not post comment. Please try again.')
+        toast('error', err.message || 'Could not post comment. Please try again.')
       }
     },
     [activeImage, activeImageId, guestName, session, toast]
@@ -272,7 +290,8 @@ export function ViewClient({
         })
 
         if (!res.ok) {
-          throw new Error('Failed to edit comment')
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || 'Failed to edit comment')
         }
 
         const updated = await res.json()
@@ -301,9 +320,9 @@ export function ViewClient({
         }))
 
         toast('success', 'Comment updated!')
-      } catch (err) {
+      } catch (err: any) {
         console.error(err)
-        toast('error', 'Failed to save edits.')
+        toast('error', err.message || 'Failed to save edits.')
       }
     },
     [activeImageId, guestName, toast]
@@ -610,13 +629,71 @@ export function ViewClient({
               </div>
             )}
 
-            <div>
-              <h1 className="max-w-[160px] truncate text-sm font-semibold sm:max-w-[260px]" title={project.title}>
-                {project.title}
-              </h1>
-              <p className="hidden text-tiny-10 text-muted-foreground sm:block">
-                Project shared by {project.user?.name}
-              </p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="max-w-[160px] truncate text-sm font-semibold sm:max-w-[260px]" title={project.title}>
+                  {project.title}
+                </h1>
+                <p className="hidden text-tiny-10 text-muted-foreground sm:block">
+                  Project shared by {project.user?.name}
+                </p>
+              </div>
+
+              {/* Status Select Badge */}
+              {project.status && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="relative select-none">
+                    <select
+                      value={project.status}
+                      onChange={async (e) => {
+                        const newStatus = e.target.value
+                        try {
+                          const res = await fetch(`/api/view/${project.publicToken}`, {
+                            method: 'PATCH',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ status: newStatus }),
+                          })
+                          if (!res.ok) {
+                            throw new Error('Failed to update status')
+                          }
+                          const updatedProject = await res.json()
+                          setProject(updatedProject)
+                          toast('success', `Project status updated to "${newStatus}"`)
+                        } catch (err) {
+                          console.error(err)
+                          toast('error', 'Failed to update project status')
+                        }
+                      }}
+                      className={cn(
+                        "rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition-all cursor-pointer outline-none focus:ring-2 focus:ring-primary/20",
+                        project.status === "Approved" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20",
+                        project.status === "Revision Needed" && "bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20",
+                        project.status === "In Review" && "bg-blue-500/10 border-blue-500/20 text-blue-500 hover:bg-blue-500/20",
+                        project.status === "In Progress" && "bg-slate-500/10 border-slate-500/20 text-slate-400 dark:text-slate-300 hover:bg-slate-500/20",
+                        !["Approved", "Revision Needed", "In Review", "In Progress"].includes(project.status) && "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
+                      )}
+                      title="Change project status"
+                    >
+                      {(project.statuses || ["In Progress", "In Review", "Revision Needed", "Approved"]).map((st) => (
+                        <option key={st} value={st} className="bg-background text-foreground font-semibold">
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Status Settings Pencil Trigger */}
+                  <button
+                    onClick={() => setIsStatusModalOpen(true)}
+                    className="p-1.5 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer"
+                    title="Manage Status Choices"
+                  >
+                    <Pencil className="h-3 w-3 text-primary" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1047,7 +1124,7 @@ export function ViewClient({
         </div>
 
         {/* Sidebar Comments Panel */}
-        <aside className="w-full shrink-0 border-t border-border bg-card/50 lg:w-80 lg:border-l lg:border-t-0">
+        <aside className="w-full shrink-0 border-t border-border bg-card/50 lg:border-l lg:border-t-0 lg:w-96">
           <div className="h-[40vh] p-4 lg:h-[calc(100vh-4rem)] lg:p-4">
             <CommentSidebar
               comments={comments}
@@ -1146,6 +1223,163 @@ export function ViewClient({
           <div className="flex items-center justify-end border-t border-border/50 pt-4">
             <Button variant="primary" size="md" onClick={() => setIsShareOpen(false)}>
               Done
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Manage Statuses Modal */}
+      <Modal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        title="Manage Status Choices"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Customize the list of status choices for this project.
+          </p>
+
+          <div className="space-y-2.5">
+            <label className="text-xs font-semibold text-foreground">
+              Current Choices
+            </label>
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1 scrollbar-thin">
+              {localStatuses.map((st, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={st}
+                    onChange={(e) => {
+                      const updated = [...localStatuses]
+                      const oldName = updated[idx]
+                      updated[idx] = e.target.value
+                      setLocalStatuses(updated)
+                      if (localStatus === oldName) {
+                        setLocalStatus(e.target.value)
+                      }
+                    }}
+                    className="flex-1 rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-foreground focus:outline-none focus:border-primary/50 font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (localStatuses.length <= 1) {
+                        toast('error', 'Project must have at least one status.')
+                        return
+                      }
+                      const updated = localStatuses.filter((_, i) => i !== idx)
+                      setLocalStatuses(updated)
+                      if (localStatus === st) {
+                        setLocalStatus(updated[0])
+                      }
+                    }}
+                    disabled={localStatuses.length <= 1}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-35 disabled:pointer-events-none transition-all cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Add New Status */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">
+              Add New Option
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="New status name..."
+                value={newStatusName}
+                onChange={(e) => setNewStatusName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    const trimmed = newStatusName.trim()
+                    if (!trimmed) return
+                    if (localStatuses.includes(trimmed)) {
+                      toast('error', 'Status already exists.')
+                      return
+                    }
+                    setLocalStatuses([...localStatuses, trimmed])
+                    setNewStatusName('')
+                  }
+                }}
+                className="flex-1 rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-foreground focus:outline-none focus:border-primary/50"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const trimmed = newStatusName.trim()
+                  if (!trimmed) return
+                  if (localStatuses.includes(trimmed)) {
+                    toast('error', 'Status already exists.')
+                    return
+                  }
+                  setLocalStatuses([...localStatuses, trimmed])
+                  setNewStatusName('')
+                }}
+                className="h-7 text-xs"
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2 border-t border-border/50 pt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsStatusModalOpen(false)}
+              disabled={isSavingStatuses}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isSavingStatuses}
+              onClick={async () => {
+                const cleanStatuses = localStatuses.map(s => s.trim()).filter(Boolean)
+                if (cleanStatuses.length === 0) {
+                  toast('error', 'At least one status option is required.')
+                  return
+                }
+                
+                setIsSavingStatuses(true)
+                try {
+                  const res = await fetch(`/api/view/${project.publicToken}`, {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      status: localStatus.trim(),
+                      statuses: cleanStatuses,
+                    }),
+                  })
+                  if (!res.ok) {
+                    throw new Error('Failed to update status settings')
+                  }
+                  const updatedProject = await res.json()
+                  setProject(updatedProject)
+                  toast('success', 'Project status configurations updated!')
+                  setIsStatusModalOpen(false)
+                } catch (err) {
+                  console.error(err)
+                  toast('error', 'Failed to update status settings.')
+                } finally {
+                  setIsSavingStatuses(false)
+                }
+              }}
+            >
+              Save Changes
             </Button>
           </div>
         </div>

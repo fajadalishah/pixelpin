@@ -46,6 +46,8 @@ interface ProjectDetails {
   user: { id: string; name: string }
   images: ImageDetails[]
   allowDownload: boolean
+  status: string
+  statuses: string[]
 }
 
 interface EditProjectModalProps {
@@ -65,6 +67,12 @@ export function EditProjectModal({
   const [images, setImages] = useState<ImageDetails[]>(project.images)
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  
+  // Project status states
+  const [status, setStatus] = useState(project.status || 'In Progress')
+  const [statuses, setStatuses] = useState<string[]>(project.statuses || ['In Progress', 'In Review', 'Revision Needed', 'Approved'])
+  const [newStatusName, setNewStatusName] = useState('')
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -153,6 +161,42 @@ export function EditProjectModal({
     }
   }
 
+  // Status list helpers
+  const handleRenameStatus = (index: number, newName: string) => {
+    if (!newName.trim()) return
+    const updated = [...statuses]
+    const oldName = updated[index]
+    updated[index] = newName.trim()
+    setStatuses(updated)
+    if (status === oldName) {
+      setStatus(newName.trim())
+    }
+  }
+
+  const handleDeleteStatus = (index: number) => {
+    if (statuses.length <= 1) {
+      toast('error', 'A project must have at least one status choice.')
+      return
+    }
+    const statusToDelete = statuses[index]
+    const updated = statuses.filter((_, idx) => idx !== index)
+    setStatuses(updated)
+    if (status === statusToDelete) {
+      setStatus(updated[0])
+    }
+  }
+
+  const handleAddStatus = () => {
+    const trimmed = newStatusName.trim()
+    if (!trimmed) return
+    if (statuses.includes(trimmed)) {
+      toast('error', 'Status already exists.')
+      return
+    }
+    setStatuses([...statuses, trimmed])
+    setNewStatusName('')
+  }
+
   // Handle saving project title and image ordering
   const handleSave = async () => {
     if (!title.trim()) {
@@ -171,6 +215,8 @@ export function EditProjectModal({
           title: title.trim(),
           imageIds: images.map((img) => img.id),
           imageRenames: images.map((img) => ({ id: img.id, originalName: img.originalName })),
+          status,
+          statuses,
         }),
       })
 
@@ -201,6 +247,87 @@ export function EditProjectModal({
           onChange={(e) => setTitle(e.target.value)}
           icon={<ImageIcon className="h-4 w-4" />}
         />
+
+        {/* Project Status Section */}
+        <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Project Status Settings
+          </h3>
+          
+          {/* Current Status Dropdown */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground">
+              Current Project Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            >
+              {statuses.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Manage Status Options */}
+          <div className="space-y-2.5">
+            <label className="text-xs font-medium text-foreground">
+              Manage Status Options
+            </label>
+            
+            <div className="space-y-2 max-h-36 overflow-y-auto scrollbar-thin">
+              {statuses.map((st, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={st}
+                    onChange={(e) => handleRenameStatus(idx, e.target.value)}
+                    className="flex-1 rounded-lg border border-border/80 bg-card px-2.5 py-1 text-xs text-foreground focus:outline-none focus:border-primary/50 transition-all font-semibold"
+                    title="Rename status option"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteStatus(idx)}
+                    disabled={statuses.length <= 1}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-transparent text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                    title="Delete status option"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add New Status option */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Add new status option..."
+                value={newStatusName}
+                onChange={(e) => setNewStatusName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleAddStatus()
+                  }
+                }}
+                className="flex-1 rounded-lg border border-border/80 bg-card px-2.5 py-1 text-xs text-foreground focus:outline-none focus:border-primary/50 transition-all font-medium"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleAddStatus}
+                className="h-7 text-xs"
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+        </div>
 
         {/* Designs List */}
         <div className="space-y-3">

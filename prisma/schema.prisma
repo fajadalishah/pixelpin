@@ -48,6 +48,8 @@ model Project {
   images        Image[]
   createdAt     DateTime @default(now())
   allowDownload Boolean  @default(true)
+  status        String   @default("In Progress")
+  statuses      String[] @default(["In Progress", "In Review", "Revision Needed", "Approved"])
 }
 
 model Image {

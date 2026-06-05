@@ -109,6 +109,8 @@ export async function GET() {
           imageCount: project._count.images,
           commentCount,
           thumbnail: project.images[0]?.filename || null,
+          status: project.status,
+          statuses: project.statuses,
           owner: {
             id: project.user.id,
             name: project.user.name,

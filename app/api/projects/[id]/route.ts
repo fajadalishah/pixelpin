@@ -15,7 +15,7 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const { title, imageIds, allowDownload } = body
+    const { title, imageIds, allowDownload, status, statuses } = body
 
     // Verify project exists and check user permissions
     const project = await prisma.project.findUnique({
@@ -68,6 +68,12 @@ export async function PATCH(
     }
     if (allowDownload !== undefined) {
       updateData.allowDownload = !!allowDownload
+    }
+    if (status !== undefined) {
+      updateData.status = status
+    }
+    if (statuses !== undefined && Array.isArray(statuses)) {
+      updateData.statuses = statuses
     }
 
     if (Object.keys(updateData).length > 0) {

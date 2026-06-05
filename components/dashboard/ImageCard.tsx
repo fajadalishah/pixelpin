@@ -14,6 +14,8 @@ interface ProjectData {
   imageCount: number
   commentCount: number
   thumbnail: string | null
+  status?: string
+  statuses?: string[]
 }
 
 interface ImageCardProps {
@@ -193,10 +195,24 @@ export function ImageCard({
 
       {/* Content */}
       <div className="p-4">
-        <a href={`/view/${image.publicToken}`}>
-          <h3 className="truncate text-sm font-semibold text-card-foreground transition-colors hover:text-primary" title={displayTitle}>
-            {displayTitle}
-          </h3>
+        <a href={`/view/${image.publicToken}`} className="block">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="truncate text-sm font-semibold text-card-foreground transition-colors hover:text-primary" title={displayTitle}>
+              {displayTitle}
+            </h3>
+            {image.status && (
+              <span className={cn(
+                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border leading-tight select-none",
+                image.status === "Approved" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
+                image.status === "Revision Needed" && "bg-amber-500/10 border-amber-500/20 text-amber-500",
+                image.status === "In Review" && "bg-blue-500/10 border-blue-500/20 text-blue-500",
+                image.status === "In Progress" && "bg-slate-500/10 border-slate-500/20 text-slate-400 dark:text-slate-300",
+                !["Approved", "Revision Needed", "In Review", "In Progress"].includes(image.status) && "bg-primary/10 border-primary/20 text-primary"
+              )}>
+                {image.status}
+              </span>
+            )}
+          </div>
         </a>
 
         {/* Bottom Bar */}

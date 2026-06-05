@@ -108,6 +108,8 @@ export default async function ViewPage({ params }: PageProps) {
     createdAt: project.createdAt.toISOString(),
     user: project.user,
     allowDownload: project.allowDownload,
+    status: project.status,
+    statuses: project.statuses,
     images: project.images.map((img) => ({
       id: img.id,
       title: img.title,

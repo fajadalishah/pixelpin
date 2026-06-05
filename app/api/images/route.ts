@@ -69,6 +69,8 @@ export async function GET() {
         imageCount,
         commentCount,
         thumbnail,
+        status: project.status,
+        statuses: project.statuses,
       }
     })
 

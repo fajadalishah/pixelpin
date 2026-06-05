@@ -256,6 +256,8 @@ export async function POST(request: Request) {
           title: newTitle,
           publicToken,
           userId: session.user.id,
+          status: project.status,
+          statuses: project.statuses,
         },
       })
 
