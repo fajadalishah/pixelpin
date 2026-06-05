@@ -1368,7 +1368,7 @@ export function ViewClient({
           {/* Sidebar Tab Contents */}
           {sidebarTab === 'designs' ? (
             /* Grid list of designs */
-            <div className="flex-1 overflow-x-auto overflow-y-hidden p-3 flex flex-row gap-3 lg:overflow-y-auto lg:overflow-x-hidden lg:flex-col lg:p-4 lg:space-y-3 lg:space-x-0">
+            <div className="flex-1 overflow-x-auto overflow-y-hidden p-3 flex flex-row gap-3 lg:block lg:overflow-y-auto lg:overflow-x-hidden lg:p-4 lg:space-y-3">
               {project.images.map((img) => {
                 const isActive = img.id === activeImageId
                 return (
@@ -1376,7 +1376,7 @@ export function ViewClient({
                     key={img.id}
                     onClick={() => handleImageSwitch(img.id)}
                     className={cn(
-                      "group relative cursor-pointer rounded-xl border overflow-hidden bg-muted/20 transition-all p-1.5 shrink-0 w-[140px] lg:w-full",
+                      "group relative cursor-pointer rounded-xl border overflow-hidden bg-muted/20 transition-all p-1.5 shrink-0 w-[140px] lg:w-full lg:shrink lg:mb-3",
                       isActive
                         ? "ring-2 ring-primary border-primary bg-primary/5"
                         : "border-border/60 hover:border-primary/50 hover:bg-accent/40"
