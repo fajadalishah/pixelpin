@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     const files = formData.getAll('files') as File[]
     const projectTitle = formData.get('title') as string | null
     const projectId = formData.get('projectId') as string | null
+    const versionOfId = formData.get('versionOfId') as string | null
 
     const linksStr = formData.get('links') as string | null
     let linksCount = 0
@@ -128,6 +129,91 @@ export async function POST(request: Request) {
     }
 
 
+
+    if (versionOfId) {
+      const oldImage = await prisma.image.findUnique({
+        where: { id: versionOfId },
+      })
+      if (!oldImage) {
+        return NextResponse.json({ error: 'Original image not found' }, { status: 404 })
+      }
+      
+      const file = files[0]
+      if (!file) {
+        return NextResponse.json({ error: 'No file provided for revision' }, { status: 400 })
+      }
+
+      const ext = file.name.substring(file.name.lastIndexOf('.'))
+      const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`
+      const blobUrl = await uploadToBlob(file, `uploads/${uniqueName}`, { contentType: file.type })
+
+      // Create new image as the main active image inheriting metadata
+      const newImage = await prisma.image.create({
+        data: {
+          title: file.name.replace(ext, ''),
+          filename: blobUrl,
+          originalName: file.name,
+          width: 1920,
+          height: 1080,
+          projectId: oldImage.projectId,
+          orderIndex: oldImage.orderIndex,
+        },
+      })
+
+      // Link old image to new image as a version
+      await prisma.image.update({
+        where: { id: oldImage.id },
+        data: { versionOfId: newImage.id },
+      })
+
+      // Migrate existing subversions of oldImage to newImage
+      await prisma.image.updateMany({
+        where: { versionOfId: oldImage.id },
+        data: { versionOfId: newImage.id },
+      })
+
+      // Fetch the updated project detail to load new designs
+      const updatedProject = await prisma.project.findUnique({
+        where: { id: oldImage.projectId },
+        include: {
+          user: {
+            select: { id: true, name: true },
+          },
+          images: {
+            where: { versionOfId: null },
+            orderBy: [
+              { orderIndex: 'asc' },
+              { createdAt: 'asc' }
+            ],
+            include: {
+              versions: {
+                orderBy: { createdAt: 'desc' },
+                include: {
+                  comments: {
+                    orderBy: { createdAt: 'asc' },
+                    include: {
+                      user: {
+                        select: { id: true, name: true }
+                      }
+                    }
+                  }
+                }
+              },
+              comments: {
+                orderBy: { createdAt: 'asc' },
+                include: {
+                  user: {
+                    select: { id: true, name: true }
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
+
+      return NextResponse.json(updatedProject, { status: 201 })
+    }
 
     let project
     let nextOrderIndex = 0

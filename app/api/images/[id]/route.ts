@@ -73,6 +73,40 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const versionsOnly = searchParams.get('versionsOnly') === 'true'
+
+    if (versionsOnly) {
+      // Delete comment attachments of versions/revisions from disk first
+      const childVersions = await prisma.image.findMany({
+        where: { versionOfId: id },
+      })
+
+      for (const child of childVersions) {
+        const childComments = await prisma.comment.findMany({
+          where: {
+            imageId: child.id,
+            NOT: { fileUrl: null },
+          },
+          select: { fileUrl: true },
+        })
+        for (const comment of childComments) {
+          if (comment.fileUrl) {
+            await deleteFromBlob(comment.fileUrl)
+          }
+        }
+        // Delete the version file from blob storage
+        await deleteFromBlob(child.filename)
+
+        // Delete the version database record (cascade deletes comments)
+        await prisma.image.delete({
+          where: { id: child.id },
+        })
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
     // Delete comment attachments from disk first
     const commentsWithAttachments = await prisma.comment.findMany({
       where: {
@@ -88,6 +122,28 @@ export async function DELETE(
       if (comment.fileUrl) {
         await deleteFromBlob(comment.fileUrl)
       }
+    }
+
+    // Delete comment attachments of versions/revisions from disk first
+    const childVersions = await prisma.image.findMany({
+      where: { versionOfId: id },
+    })
+
+    for (const child of childVersions) {
+      const childComments = await prisma.comment.findMany({
+        where: {
+          imageId: child.id,
+          NOT: { fileUrl: null },
+        },
+        select: { fileUrl: true },
+      })
+      for (const comment of childComments) {
+        if (comment.fileUrl) {
+          await deleteFromBlob(comment.fileUrl)
+        }
+      }
+      // Delete the version file from blob storage
+      await deleteFromBlob(child.filename)
     }
 
     // Delete comments first (cascade should handle it, but being explicit)

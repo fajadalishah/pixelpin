@@ -64,6 +64,11 @@ model Image {
   comments     Comment[]
   orderIndex   Int       @default(0)
   createdAt    DateTime  @default(now())
+
+  // Revisions relation
+  versionOfId  String?
+  versionOf    Image?    @relation("ImageVersions", fields: [versionOfId], references: [id], onDelete: Cascade)
+  versions     Image[]   @relation("ImageVersions")
 }
 
 model Comment {

@@ -18,11 +18,28 @@ export async function GET(
           },
         },
         images: {
+          where: { versionOfId: null },
           orderBy: [
             { orderIndex: 'asc' },
             { createdAt: 'asc' }
           ],
           include: {
+            versions: {
+              orderBy: { createdAt: 'desc' },
+              include: {
+                comments: {
+                  orderBy: { createdAt: 'asc' },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
             comments: {
               orderBy: { createdAt: 'asc' },
               include: {
@@ -88,11 +105,28 @@ export async function PATCH(
           },
         },
         images: {
+          where: { versionOfId: null },
           orderBy: [
             { orderIndex: 'asc' },
             { createdAt: 'asc' }
           ],
           include: {
+            versions: {
+              orderBy: { createdAt: 'desc' },
+              include: {
+                comments: {
+                  orderBy: { createdAt: 'asc' },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
             comments: {
               orderBy: { createdAt: 'asc' },
               include: {

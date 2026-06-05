@@ -22,6 +22,7 @@ import {
   Square,
   Circle as CircleIcon,
   Pencil,
+  Plus,
   Zap,
   Globe,
   FileText,
@@ -77,6 +78,7 @@ interface ImageDetails {
   projectId: string
   createdAt: string
   comments: Comment[]
+  versions?: ImageDetails[]
 }
 
 interface ProjectDetails {
@@ -137,6 +139,13 @@ export function ViewClient({
     setPreviewAttachment({ url, name: fileName, type: fileType })
   }, [])
 
+  const [viewingImageId, setViewingImageId] = useState<string | null>(null)
+
+  // Reset viewingImageId when switching images/designs
+  useEffect(() => {
+    setViewingImageId(null)
+  }, [activeImageId])
+
   // Sync manage status states
   useEffect(() => {
     if (isStatusModalOpen) {
@@ -195,7 +204,176 @@ export function ViewClient({
 
   // Helper: find active image in state
   const activeImage = project.images.find((img) => img.id === activeImageId)
-  const comments = activeImage?.comments || []
+  
+  const currentDisplayedImage = (() => {
+    if (!activeImage) return null
+    if (viewingImageId) {
+      if (activeImage.id === viewingImageId) return activeImage
+      return activeImage.versions?.find((v) => v.id === viewingImageId) || activeImage
+    }
+    return activeImage
+  })()
+
+  const comments = currentDisplayedImage?.comments || []
+
+  // Shared helper to update comments inside project state (both main and versions)
+  const updateProjectCommentsState = useCallback((commentId: string, updateFn: (comment: Comment) => Comment | null) => {
+    setProject((prev) => ({
+      ...prev,
+      images: prev.images.map((img) => {
+        if (img.id === activeImageId) {
+          const hasComment = img.comments.some((c) => c.id === commentId)
+          if (hasComment) {
+            return {
+              ...img,
+              comments: img.comments.map((c) => c.id === commentId ? updateFn(c) : c).filter(Boolean) as Comment[],
+            }
+          }
+          const updatedVersions = img.versions?.map((v) => {
+            const hasCommentInVersion = v.comments.some((c) => c.id === commentId)
+            if (hasCommentInVersion) {
+              return {
+                ...v,
+                comments: v.comments.map((c) => c.id === commentId ? updateFn(c) : c).filter(Boolean) as Comment[],
+              }
+            }
+            return v
+          })
+          return {
+            ...img,
+            versions: updatedVersions,
+          }
+        }
+        return img
+      })
+    }))
+  }, [activeImageId])
+
+  // Handle uploading revised version of the active image
+  const handleUploadRevision = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !activeImage) return
+
+    const formData = new FormData()
+    formData.append('files', file)
+    formData.append('versionOfId', activeImage.id)
+    formData.append('projectId', project.id)
+
+    toast('info', 'Uploading revised version...')
+    try {
+      const res = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to upload revised version')
+      }
+
+      const updatedProj = await res.json()
+      setProject(updatedProj)
+
+      // Find the new active image ID (the one that contains the old activeImageId in its versions list)
+      const oldImageId = activeImage.id
+      const newActiveImage = updatedProj.images.find((img: any) =>
+        img.id === oldImageId || img.versions?.some((v: any) => v.id === oldImageId)
+      )
+
+      if (newActiveImage) {
+        setActiveImageId(newActiveImage.id)
+        setViewingImageId(null) // display the latest active version
+      }
+
+      toast('success', 'Revised version uploaded successfully!')
+    } catch (err: any) {
+      console.error(err)
+      toast('error', err.message || 'Upload failed.')
+    } finally {
+      if (e.target) e.target.value = ''
+    }
+  }, [activeImage, project.id, toast])
+
+  // Handle deleting previous version (revision)
+  const handleDeleteRevision = useCallback(async (revisionId: string) => {
+    if (!confirm('Are you sure you want to delete this revision? This will permanently delete this version and all comments pinned to it.')) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/images/${revisionId}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to delete revision')
+      }
+
+      if (viewingImageId === revisionId) {
+        setViewingImageId(null)
+      }
+
+      setProject((prev) => ({
+        ...prev,
+        images: prev.images.map((img) =>
+          img.id === activeImageId
+            ? {
+                ...img,
+                versions: img.versions?.filter((v) => v.id !== revisionId) || [],
+              }
+            : img
+        ),
+      }))
+
+      toast('success', 'Revision deleted successfully.')
+    } catch (err) {
+      console.error(err)
+      toast('error', 'Failed to delete revision.')
+    }
+  }, [activeImageId, viewingImageId, toast])
+
+  // Handle deleting all previous versions (revisions) at once
+  const handleDeleteAllRevisions = useCallback(async () => {
+    if (!activeImage) return
+    if (
+      !confirm(
+        'Are you sure you want to delete all previous versions? This will permanently delete all historical revisions and all comments pinned to them.'
+      )
+    ) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/images/${activeImage.id}?versionsOnly=true`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to delete all revisions')
+      }
+
+      if (viewingImageId && viewingImageId !== activeImage.id) {
+        setViewingImageId(null)
+      }
+
+      setProject((prev) => ({
+        ...prev,
+        images: prev.images.map((img) =>
+          img.id === activeImageId
+            ? {
+                ...img,
+                versions: [],
+              }
+            : img
+        ),
+      }))
+
+      toast('success', 'All previous versions deleted successfully.')
+    } catch (err) {
+      console.error(err)
+      toast('error', 'Failed to delete previous versions.')
+    }
+  }, [activeImage, activeImageId, viewingImageId, toast])
 
   const handleProjectUpdated = useCallback((updatedProject: ProjectDetails) => {
     setProject(updatedProject)
@@ -305,27 +483,12 @@ export function ViewClient({
 
         const updated = await res.json()
 
-        // Update comment in project state
-        setProject((prev) => ({
-          ...prev,
-          images: prev.images.map((img) =>
-            img.id === activeImageId
-              ? {
-                  ...img,
-                  comments: img.comments.map((c) =>
-                    c.id === id
-                      ? {
-                          ...c,
-                          content: updated.content,
-                          fileUrl: updated.fileUrl,
-                          fileName: updated.fileName,
-                          fileType: updated.fileType,
-                        }
-                      : c
-                  ),
-                }
-              : img
-          ),
+        updateProjectCommentsState(id, (c) => ({
+          ...c,
+          content: updated.content,
+          fileUrl: updated.fileUrl,
+          fileName: updated.fileName,
+          fileType: updated.fileType,
         }))
 
         toast('success', 'Comment updated!')
@@ -334,14 +497,17 @@ export function ViewClient({
         toast('error', err.message || 'Failed to save edits.')
       }
     },
-    [activeImageId, guestName, toast]
+    [guestName, updateProjectCommentsState, toast]
   )
 
   const handleResolveComment = useCallback(
     async (id: string) => {
-      const commentToUpdate = project.images
-        .flatMap((img) => img.comments)
-        .find((c) => c.id === id)
+      // Find comment in main comments or version comments
+      const allComments = [
+        ...project.images.flatMap((img) => img.comments),
+        ...project.images.flatMap((img) => img.versions || []).flatMap((v) => v.comments),
+      ]
+      const commentToUpdate = allComments.find((c) => c.id === id)
       const nextResolved = !(commentToUpdate?.resolved ?? false)
 
       try {
@@ -361,19 +527,9 @@ export function ViewClient({
 
         const updated = await res.json()
 
-        // Update resolved status in project state
-        setProject((prev) => ({
-          ...prev,
-          images: prev.images.map((img) =>
-            img.id === activeImageId
-              ? {
-                  ...img,
-                  comments: img.comments.map((c) =>
-                    c.id === id ? { ...c, resolved: updated.resolved } : c
-                  ),
-                }
-              : img
-          ),
+        updateProjectCommentsState(id, (c) => ({
+          ...c,
+          resolved: updated.resolved,
         }))
 
         toast(
@@ -385,7 +541,7 @@ export function ViewClient({
         toast('error', 'Failed to update comment status.')
       }
     },
-    [project.images, activeImageId, guestName, toast]
+    [project.images, guestName, updateProjectCommentsState, toast]
   )
 
   const handleDeleteComment = useCallback(
@@ -399,18 +555,7 @@ export function ViewClient({
           throw new Error('Failed to delete comment')
         }
 
-        // Remove comment from project state
-        setProject((prev) => ({
-          ...prev,
-          images: prev.images.map((img) =>
-            img.id === activeImageId
-              ? {
-                  ...img,
-                  comments: img.comments.filter((c) => c.id !== id),
-                }
-              : img
-          ),
-        }))
+        updateProjectCommentsState(id, () => null)
 
         if (selectedCommentId === id) {
           setSelectedCommentId(null)
@@ -422,7 +567,7 @@ export function ViewClient({
         toast('error', 'Failed to delete comment.')
       }
     },
-    [activeImageId, guestName, selectedCommentId, toast]
+    [guestName, selectedCommentId, updateProjectCommentsState, toast]
   )
 
   // Actions context dropdown handlers for comments shape reselection
@@ -456,24 +601,10 @@ export function ViewClient({
 
         const updated = await res.json()
 
-        setProject((prev) => ({
-          ...prev,
-          images: prev.images.map((img) =>
-            img.id === activeImageId
-              ? {
-                  ...img,
-                  comments: img.comments.map((c) =>
-                    c.id === commentId
-                      ? {
-                          ...c,
-                          annotationType: updated.annotationType,
-                          annotationData: updated.annotationData,
-                        }
-                      : c
-                  ),
-                }
-              : img
-          ),
+        updateProjectCommentsState(commentId, (c) => ({
+          ...c,
+          annotationType: updated.annotationType,
+          annotationData: updated.annotationData,
         }))
 
         toast('success', 'Annotation shape updated!')
@@ -485,7 +616,7 @@ export function ViewClient({
         setRedrawingTool(null)
       }
     },
-    [activeImageId, guestName, toast]
+    [guestName, updateProjectCommentsState, toast]
   )
 
   const handleCommentColorChange = useCallback(
@@ -522,18 +653,9 @@ export function ViewClient({
 
         const updated = await res.json()
 
-        setProject((prev) => ({
-          ...prev,
-          images: prev.images.map((img) =>
-            img.id === activeImageId
-              ? {
-                  ...img,
-                  comments: img.comments.map((c) =>
-                    c.id === commentId ? { ...c, annotationData: updated.annotationData } : c
-                  ),
-                }
-              : img
-          ),
+        updateProjectCommentsState(commentId, (c) => ({
+          ...c,
+          annotationData: updated.annotationData,
         }))
 
         toast('success', 'Annotation color updated!')
@@ -542,7 +664,7 @@ export function ViewClient({
         toast('error', 'Failed to update color.')
       }
     },
-    [comments, activeImageId, guestName, toast]
+    [comments, guestName, updateProjectCommentsState, toast]
   )
 
   const handleGuestSubmit = (name: string) => {
@@ -1048,26 +1170,133 @@ export function ViewClient({
             </div>
           ) : (
             /* Revisions / Version History timeline */
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 animate-fade-in select-none">
-              <div className="flex items-center gap-2 border-b border-border/60 pb-3 mb-2 shrink-0">
-                <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Revision History</span>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary">Active</span>
-              </div>
-              <div className="relative pl-4 border-l border-border/80 ml-2 space-y-6">
-                {/* Mock Revisions Timeline based on uploaded designs */}
-                <div className="relative">
-                  <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
-                  <span className="text-[10px] font-bold text-primary">v1.1 - Current Version</span>
-                  <p className="text-[11px] text-foreground mt-1">Design upload iteration completed.</p>
-                  <p className="text-[9px] text-muted-foreground mt-0.5">Uploaded {new Date(project.createdAt).toLocaleDateString()} · by {project.user?.name}</p>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-border/60 pb-3 mb-2 shrink-0 select-none">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">Revision History</span>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary">Active</span>
                 </div>
-                <div className="relative">
-                  <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-muted-foreground/55 ring-4 ring-background" />
-                  <span className="text-[10px] font-bold text-muted-foreground">v1.0 - Initial Upload</span>
-                  <p className="text-[11px] text-foreground mt-1">Project created with {project.images.length} images.</p>
-                  <p className="text-[9px] text-muted-foreground mt-0.5">Created {new Date(project.createdAt).toLocaleDateString()} · by {project.user?.name}</p>
-                </div>
+                {isOwner && activeImage && (activeImage.versions?.length ?? 0) > 0 && (
+                  <button
+                    onClick={handleDeleteAllRevisions}
+                    className="text-[10px] font-bold text-rose-500 hover:text-rose-400 transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Delete all previous versions"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    <span>Clear History</span>
+                  </button>
+                )}
               </div>
+
+              {isOwner && activeImage && (
+                <div className="mb-4 select-none">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf"
+                    onChange={handleUploadRevision}
+                    className="hidden"
+                    id="revision-file-upload"
+                  />
+                  <label
+                    htmlFor="revision-file-upload"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/80 hover:border-primary/50 bg-muted/10 hover:bg-muted/20 px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-all cursor-pointer shadow-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Upload Revised Version
+                  </label>
+                </div>
+              )}
+
+              {(() => {
+                const activeImageVersions = activeImage?.versions || []
+                const allHistory = activeImage ? [activeImage, ...activeImageVersions] : []
+                const sortedHistory = [...allHistory].sort(
+                  (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                )
+                const displayHistory = [...sortedHistory].reverse()
+
+                if (allHistory.length === 0) {
+                  return (
+                    <div className="text-center text-xs text-muted-foreground py-8 select-none">
+                      No revision history available.
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="relative pl-4 border-l border-border/80 ml-2 space-y-6">
+                    {displayHistory.map((item, idx) => {
+                      const originalIdx = sortedHistory.indexOf(item)
+                      const versionLabel = `v1.${originalIdx}`
+                      const isLatest = item.id === activeImage?.id
+                      const isSelected = (!viewingImageId && isLatest) || (viewingImageId === item.id)
+
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => setViewingImageId(item.id)}
+                          className={cn(
+                            "relative p-3 rounded-xl border transition-all cursor-pointer group",
+                            isSelected
+                              ? "bg-primary/5 border-primary/20 shadow-sm"
+                              : "bg-card/40 border-transparent hover:border-border/60 hover:bg-card/80"
+                          )}
+                        >
+                          {/* Timeline Node dot */}
+                          <div
+                            className={cn(
+                              "absolute -left-[22.5px] top-4.5 h-2.5 w-2.5 rounded-full ring-4 ring-background transition-all",
+                              isSelected
+                                ? "bg-primary scale-110"
+                                : "bg-muted-foreground/45 group-hover:bg-muted-foreground/70"
+                            )}
+                          />
+
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 select-none">
+                                <span className={cn(
+                                  "text-[10px] font-bold uppercase tracking-wider",
+                                  isSelected ? "text-primary" : "text-muted-foreground"
+                                )}>
+                                  {versionLabel}
+                                </span>
+                                {isLatest && (
+                                  <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.2 text-[8px] font-black text-emerald-500 uppercase tracking-wide">
+                                    Current
+                                  </span>
+                                )}
+                              </div>
+                              <p className="truncate text-xs font-bold text-foreground mt-1" title={item.originalName}>
+                                {item.originalName}
+                              </p>
+                              <p className="text-[9px] text-muted-foreground mt-0.5 select-none">
+                                Uploaded {new Date(item.createdAt).toLocaleDateString()}
+                                {item.comments.length > 0 && ` · ${item.comments.length} ${item.comments.length === 1 ? 'comment' : 'comments'}`}
+                              </p>
+                            </div>
+
+                            {/* Delete Revision Action Button */}
+                            {isOwner && !isLatest && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteRevision(item.id)
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg border border-transparent text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
+                                title="Delete this revision"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </div>
           )}
         </div>
@@ -1092,20 +1321,33 @@ export function ViewClient({
         </button>
 
         {/* Workspace Canvas Area */}
-        <div className="flex-1 bg-muted/5 relative overflow-hidden h-full flex items-center justify-center">
-          <div className="w-full h-full relative">
-            {activeImage ? (
+        <div className="flex-1 bg-muted/5 relative overflow-hidden h-full flex flex-col items-center justify-center">
+          {viewingImageId && viewingImageId !== activeImage?.id && (
+            <div className="w-full bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-500 shrink-0 select-none animate-fade-in">
+              <span className="font-semibold">
+                Viewing a historical version of this design. Comments are read-only.
+              </span>
+              <button
+                onClick={() => setViewingImageId(null)}
+                className="underline hover:text-amber-400 font-bold cursor-pointer"
+              >
+                Switch to Latest Version
+              </button>
+            </div>
+          )}
+          <div className="w-full flex-1 relative">
+            {currentDisplayedImage ? (
               <AnnotationCanvas
                 imageUrl={
-                  activeImage.filename.startsWith('http://') || activeImage.filename.startsWith('https://')
-                    ? activeImage.filename
-                    : getImageUrl(activeImage.filename)
+                  currentDisplayedImage.filename.startsWith('http://') || currentDisplayedImage.filename.startsWith('https://')
+                    ? currentDisplayedImage.filename
+                    : getImageUrl(currentDisplayedImage.filename)
                 }
                 onViewAttachment={handleViewAttachment}
-                boardTitle={activeImage.originalName}
+                boardTitle={currentDisplayedImage.originalName}
                 comments={showComments ? comments : []}
                 onAddComment={handleAddComment}
-                isCommentMode={isCommentMode}
+                isCommentMode={isCommentMode && (!viewingImageId || viewingImageId === activeImage?.id)}
                 selectedCommentId={selectedCommentId}
                 onSelectComment={setSelectedCommentId}
                 onResolve={handleResolveComment}

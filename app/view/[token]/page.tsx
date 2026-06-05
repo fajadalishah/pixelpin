@@ -35,8 +35,25 @@ export default async function ViewPage({ params }: PageProps) {
         },
       },
       images: {
+        where: { versionOfId: null },
         orderBy: { createdAt: 'asc' },
         include: {
+          versions: {
+            orderBy: { createdAt: 'desc' },
+            include: {
+              comments: {
+                orderBy: { createdAt: 'asc' },
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           comments: {
             orderBy: { createdAt: 'asc' },
             include: {
@@ -110,32 +127,36 @@ export default async function ViewPage({ params }: PageProps) {
     allowDownload: project.allowDownload,
     status: project.status,
     statuses: project.statuses,
-    images: project.images.map((img) => ({
-      id: img.id,
-      title: img.title,
-      filename: img.filename,
-      originalName: img.originalName,
-      width: img.width,
-      height: img.height,
-      projectId: img.projectId,
-      createdAt: img.createdAt.toISOString(),
-      comments: img.comments.map((comment) => ({
-        id: comment.id,
-        content: comment.content,
-        xPercent: comment.xPercent,
-        yPercent: comment.yPercent,
-        guestName: comment.guestName,
-        userId: comment.userId,
-        resolved: comment.resolved,
-        fileUrl: comment.fileUrl,
-        fileName: comment.fileName,
-        fileType: comment.fileType,
-        annotationType: comment.annotationType,
-        annotationData: comment.annotationData,
-        createdAt: comment.createdAt.toISOString(),
-        user: comment.user,
-      })),
-    })),
+    images: project.images.map((img) => {
+      const serializeImage = (image: any): any => ({
+        id: image.id,
+        title: image.title,
+        filename: image.filename,
+        originalName: image.originalName,
+        width: image.width,
+        height: image.height,
+        projectId: image.projectId,
+        createdAt: image.createdAt.toISOString(),
+        comments: image.comments.map((comment: any) => ({
+          id: comment.id,
+          content: comment.content,
+          xPercent: comment.xPercent,
+          yPercent: comment.yPercent,
+          guestName: comment.guestName,
+          userId: comment.userId,
+          resolved: comment.resolved,
+          fileUrl: comment.fileUrl,
+          fileName: comment.fileName,
+          fileType: comment.fileType,
+          annotationType: comment.annotationType,
+          annotationData: comment.annotationData,
+          createdAt: comment.createdAt.toISOString(),
+          user: comment.user,
+        })),
+        versions: image.versions ? image.versions.map((v: any) => serializeImage(v)) : [],
+      })
+      return serializeImage(img)
+    }),
   }
 
   return (
